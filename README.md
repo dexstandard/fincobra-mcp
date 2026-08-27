@@ -1,8 +1,8 @@
-# FinCobra MCP
+# FinCobra MCP — crypto checkout for Claude, Cursor, and Codex
 
-Thin [Model Context Protocol](https://modelcontextprotocol.io) server for FinCobra Checkout and Watchlist.
+[Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for FinCobra crypto checkout and payments. Create hosted invoices for BTC, USDT, and USDC (settlement assets come from dashboard payment methods; amounts are USD). Works with Claude Code, Cursor, and Codex. Watchlist access is read-only. Not on npm yet — install from GitHub.
 
-Docs: [FinCobra Checkout MCP](https://fincobra.com/docs/checkout/mcp.html) (this page is being published alongside the repo).
+Docs: [FinCobra Checkout MCP](https://fincobra.com/docs/checkout/mcp.html)
 
 `fincobra-mcp` 0.1.0 is **not published to npm yet**. Until it is, install from GitHub:
 
