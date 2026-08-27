@@ -55,12 +55,13 @@
   "bugs": {
     "url": "https://github.com/dexstandard/fincobra-mcp/issues"
   },
-  "homepage": "https://github.com/dexstandard/fincobra-mcp#readme",
+  "homepage": "https://fincobra.com/docs/checkout/mcp.html",
   "keywords": [
     "mcp",
     "fincobra",
     "checkout",
     "watchlist",
+    "cryptocurrency",
     "modelcontextprotocol"
   ],
   "publishConfig": {
