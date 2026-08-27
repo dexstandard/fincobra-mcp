@@ -2,11 +2,15 @@
 
 Thin [Model Context Protocol](https://modelcontextprotocol.io) server for FinCobra Checkout and Watchlist.
 
-Install from GitHub (v0):
+Docs: [FinCobra Checkout MCP](https://fincobra.com/docs/checkout/mcp.html) (this page is being published alongside the repo).
+
+`fincobra-mcp` 0.1.0 is **not published to npm yet**. Until it is, install from GitHub:
 
 ```bash
 npx -y github:dexstandard/fincobra-mcp
 ```
+
+Pin a source release with `npx -y github:dexstandard/fincobra-mcp#v0.1.0`. Requires Node.js 20+.
 
 - Checkout: create a hosted payment invoice and read its status
 - Watchlist: read-only source list and manual net-worth breakdown
@@ -52,9 +56,9 @@ Watchlist tools do not add wallets, edit banks, change billing, or export taxes.
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `FINCOBRA_CHECKOUT_API_KEY` | One of the two surfaces | Checkout API key (`fc_live_...`). `FINCOBRA_API_KEY` is also accepted. |
+| `FINCOBRA_CHECKOUT_API_KEY` or `FINCOBRA_API_KEY` | One of the two surfaces | Checkout dashboard API key (`fc_live_...`). The Checkout-specific name is preferred when both are set. |
 | `FINCOBRA_CHECKOUT_BASE_URL` | No | Checkout origin. Defaults to `https://fincobra.com`. |
-| `FINCOBRA_WATCHLIST_SESSION_TOKEN` | One of the two surfaces | Identity `session` cookie value. `FINCOBRA_SESSION_TOKEN` is also accepted. |
+| `FINCOBRA_WATCHLIST_SESSION_TOKEN` or `FINCOBRA_SESSION_TOKEN` | One of the two surfaces | Identity `session` cookie value. The Watchlist-specific name is preferred when both are set. |
 | `FINCOBRA_WATCHLIST_BASE_URL` | No | Watchlist origin. Defaults to `https://watch.fincobra.com`. |
 
 Configure Checkout, Watchlist, or both. Tools for a missing surface return a configuration error.
@@ -165,3 +169,7 @@ Watchlist:
 - Auth: `Cookie: session=...`
 
 Send the payer to `paymentUrl`. Treat `confirmed` and `paid_out_of_band` as paid. Treat `payment_detected` as pending unless you accept unconfirmed crypto payments.
+
+## License
+
+[MIT](LICENSE)
