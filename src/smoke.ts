@@ -9,6 +9,7 @@ async function main(): Promise<void> {
   if (env.checkout) {
     const client = createCheckoutClient({
       apiKey: env.checkout.apiKey,
+      accessToken: env.checkout.accessToken,
       baseUrl: env.checkout.baseUrl,
     });
     const created = await client.createInvoice({
@@ -25,7 +26,7 @@ async function main(): Promise<void> {
 
   if (env.watchlist) {
     const client = createWatchlistClient({
-      sessionToken: env.watchlist.sessionToken,
+      accessToken: env.watchlist.accessToken,
       baseUrl: env.watchlist.baseUrl,
     });
     const sources = await client.listSources();
@@ -49,7 +50,7 @@ void main().catch((err: unknown) => {
       : String(err);
   process.stderr.write(`${message}\n`);
   process.stderr.write(
-    'Set FINCOBRA_CHECKOUT_API_KEY and/or FINCOBRA_WATCHLIST_SESSION_TOKEN, then rerun npm run smoke.\n',
+    'Run `npx -y fincobra-mcp login` or set FINCOBRA_CHECKOUT_API_KEY, then rerun npm run smoke.\n',
   );
   process.exitCode = 1;
 });

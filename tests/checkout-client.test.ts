@@ -101,6 +101,43 @@ describe('createCheckoutClient', () => {
     expect(invoice.remainingAmountUsd).toBe(0);
   });
 
+  it('creates an invoice with a browser login credential', async () => {
+    const fetchImpl = vi.fn<CheckoutFetch>(async (_url, init) => {
+      expect(init?.headers).toMatchObject({
+        Authorization: 'Bearer fcm_checkout',
+        'Content-Type': 'application/json',
+      });
+      expect(init?.headers).not.toHaveProperty('X-Api-Key');
+      return jsonResponse(201, invoicePayload);
+    });
+
+    const client = createCheckoutClient({
+      accessToken: 'fcm_checkout',
+      fetchImpl,
+    });
+
+    await client.createInvoice({ amountUsd: 49.99 });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it('prefers the Checkout API key when both credentials are set', async () => {
+    const fetchImpl = vi.fn<CheckoutFetch>(async (_url, init) => {
+      expect(init?.headers).toMatchObject({
+        'X-Api-Key': 'fc_live_test',
+      });
+      expect(init?.headers).not.toHaveProperty('Authorization');
+      return jsonResponse(201, invoicePayload);
+    });
+
+    const client = createCheckoutClient({
+      apiKey: 'fc_live_test',
+      accessToken: 'fcm_checkout',
+      fetchImpl,
+    });
+
+    await client.createInvoice({ amountUsd: 49.99 });
+  });
+
   it('explains an invalid API key', async () => {
     const client = createCheckoutClient({
       apiKey: 'fc_live_bad',
@@ -112,6 +149,20 @@ describe('createCheckoutClient', () => {
       statusCode: 401,
       message:
         'Invalid API key. Set FINCOBRA_CHECKOUT_API_KEY to a valid Checkout API key.',
+    });
+  });
+
+  it('explains an expired browser login', async () => {
+    const client = createCheckoutClient({
+      accessToken: 'fcm_expired',
+      fetchImpl: async () =>
+        jsonResponse(401, { error: 'Invalid FinCobra login' }),
+    });
+
+    await expect(client.createInvoice({ amountUsd: 1 })).rejects.toMatchObject({
+      name: 'CheckoutApiError',
+      statusCode: 401,
+      message: 'Invalid FinCobra login. Run `npx -y fincobra-mcp login` again.',
     });
   });
 
@@ -156,9 +207,9 @@ describe('createCheckoutClient', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('rejects an empty API key', () => {
+  it('rejects empty Checkout credentials', () => {
     expect(() => createCheckoutClient({ apiKey: '   ' })).toThrow(
-      'Checkout API key is empty',
+      'Checkout authentication is missing',
     );
   });
 });

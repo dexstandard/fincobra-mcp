@@ -1,174 +1,145 @@
 # FinCobra MCP — crypto checkout for Claude, Cursor, and Codex
 
-[Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for FinCobra crypto checkout and payments. Create hosted invoices for BTC, USDT, and USDC (settlement assets come from dashboard payment methods; amounts are USD). Works with Claude Code, Cursor, and Codex. Watchlist access is read-only. Not on npm yet — install from GitHub.
+[Model Context Protocol](https://modelcontextprotocol.io) server for FinCobra Checkout and read-only Watchlist data. It creates hosted BTC, USDT, and USDC invoices and reads the sources in your FinCobra Watchlist.
 
 Docs: [FinCobra Checkout MCP](https://fincobra.com/docs/checkout/mcp.html)
 
-`fincobra-mcp` 0.1.0 is **not published to npm yet**. Until it is, install from GitHub:
+## Quick start
+
+You need Node.js 20 or later and a FinCobra account. `npx` installs the package when you run it. A global install is not required.
+
+1. Install the package and sign in:
 
 ```bash
-npx -y github:dexstandard/fincobra-mcp
+npx -y fincobra-mcp login
 ```
 
-Pin a source release with `npx -y github:dexstandard/fincobra-mcp#v0.1.0`. Requires Node.js 20+.
+The command opens FinCobra in your browser.
 
-- Checkout: create a hosted payment invoice and read its status
-- Watchlist: read-only source list and manual net-worth breakdown
+- If you are not signed in, complete the normal FinCobra sign-in window. The approval request appears immediately after sign-in.
+- If you are already signed in, the approval request appears immediately.
+- Confirm that the code in the browser matches the CLI code, review the requested access, and select **Approve FinCobra MCP**.
+- Return to the terminal. The CLI confirms the FinCobra account and saves a separate revocable credential automatically.
 
-This is not a payments platform and not a Watchlist write API.
+You do not copy browser cookies, session tokens, or access tokens.
 
-## Tools (v0)
+2. Add the MCP command to your client:
+
+```bash
+npx -y fincobra-mcp
+```
+
+3. Restart the MCP client.
+
+Check or remove the saved login at any time:
+
+```bash
+npx -y fincobra-mcp status
+npx -y fincobra-mcp logout
+```
+
+Pin this release with `npx -y fincobra-mcp@0.2.0`.
+
+## Access model
+
+Browser login gives the CLI a dedicated credential with only these approved scopes:
+
+| Scope            | Access                                                                |
+| ---------------- | --------------------------------------------------------------------- |
+| `watchlist:read` | Read Watchlist wallets, exchanges, manual assets, and exchange rates. |
+| `checkout:read`  | Read a Checkout invoice by its invoice ID.                            |
+| `checkout:write` | Create a Checkout invoice.                                            |
+
+The CLI never reads or stores the Identity browser session cookie. The saved CLI credential expires, can be revoked with `logout`, and cannot access general account settings.
+
+A Checkout dashboard API key remains available for server automation. Set `FINCOBRA_CHECKOUT_API_KEY` or `FINCOBRA_API_KEY` in the MCP process. An API key takes priority over the browser login for Checkout tools. Watchlist uses browser login because it has no public API key.
+
+## Tools
 
 ### Checkout
 
-| Tool | What it does |
-| --- | --- |
-| `create_invoice` | Create a USD invoice. Returns `id` and hosted `paymentUrl` (`/pay/:id`). |
-| `get_invoice` | Look up a known invoice by `id`. Returns status, `paymentUrl`, and amounts. |
+| Tool             | What it does                                                          |
+| ---------------- | --------------------------------------------------------------------- |
+| `create_invoice` | Create a USD invoice. Returns its ID and hosted payment URL.          |
+| `get_invoice`    | Read a known invoice by ID. Returns status, payment URL, and amounts. |
 
-There is no `list_invoices` tool. Checkout API keys cannot list invoices.
+Invoice settlement assets come from the merchant's Checkout payment methods:
 
-Invoice amounts are USD. Settlement assets come from dashboard payment methods:
-
-| Network | Assets |
-| --- | --- |
-| Bitcoin (xpub) | BTC |
+| Network          | Assets     |
+| ---------------- | ---------- |
+| Bitcoin          | BTC        |
 | Ethereum mainnet | USDT, USDC |
-| Solana | USDT, USDC |
-| Arbitrum One | USDC |
-| Base | USDC |
+| Solana           | USDT, USDC |
+| Arbitrum One     | USDC       |
+| Base             | USDC       |
 
 ### Watchlist (read-only)
 
-| Tool | What it does |
-| --- | --- |
-| `get_net_worth` | Manual banks / cash / property totals in USD. `cryptoUsd` is null. |
-| `list_sources` | Wallets, exchanges, and manual assets from existing list APIs. |
-| `get_source` | One source by id (`wallet:12`, `exchange:binance`, `manual:3`). |
+| Tool            | What it does                                          |
+| --------------- | ----------------------------------------------------- |
+| `get_net_worth` | Return manual bank, cash, and property totals in USD. |
+| `list_sources`  | List wallets, exchanges, and manual assets.           |
+| `get_source`    | Read one source by the ID from `list_sources`.        |
 
-Watchlist has no public API key. Auth is the Identity `session` cookie used by the Watchlist web app.
+Banks, cash, and property are manual entries. Live crypto USD balances are computed in the Watchlist UI and are not returned by the current list API, so `cryptoUsd` is `null`.
 
-Banks, cash, and property are manual product entries, not live bank or title feeds. Live crypto USD balances are computed in the Watchlist UI and are not on the list API. The server does not invent a `cryptoUsd` total.
+## Client examples
 
-Watchlist tools do not add wallets, edit banks, change billing, or export taxes.
+### Cursor
 
-## Environment
-
-| Variable | Required | Description |
-| --- | --- | --- |
-| `FINCOBRA_CHECKOUT_API_KEY` or `FINCOBRA_API_KEY` | One of the two surfaces | Checkout dashboard API key (`fc_live_...`). The Checkout-specific name is preferred when both are set. |
-| `FINCOBRA_CHECKOUT_BASE_URL` | No | Checkout origin. Defaults to `https://fincobra.com`. |
-| `FINCOBRA_WATCHLIST_SESSION_TOKEN` or `FINCOBRA_SESSION_TOKEN` | One of the two surfaces | Identity `session` cookie value. The Watchlist-specific name is preferred when both are set. |
-| `FINCOBRA_WATCHLIST_BASE_URL` | No | Watchlist origin. Defaults to `https://watch.fincobra.com`. |
-
-Configure Checkout, Watchlist, or both. Tools for a missing surface return a configuration error.
-
-Development origins: `https://dev.fincobra.com` and `https://watch.dev.fincobra.com`.
-
-## Cursor
-
-Add to `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (user):
+Add this to `.cursor/mcp.json` or `~/.cursor/mcp.json` after you run the login command:
 
 ```json
 {
   "mcpServers": {
     "fincobra": {
       "command": "npx",
-      "args": ["-y", "github:dexstandard/fincobra-mcp"],
-      "env": {
-        "FINCOBRA_CHECKOUT_API_KEY": "fc_live_...",
-        "FINCOBRA_CHECKOUT_BASE_URL": "https://fincobra.com",
-        "FINCOBRA_WATCHLIST_SESSION_TOKEN": "<session-cookie-value>",
-        "FINCOBRA_WATCHLIST_BASE_URL": "https://watch.fincobra.com"
-      }
+      "args": ["-y", "fincobra-mcp"]
     }
   }
 }
 ```
 
-## Claude Code
+### Claude Code
 
 ```bash
-claude mcp add fincobra \
-  --env FINCOBRA_CHECKOUT_API_KEY=fc_live_... \
-  --env FINCOBRA_WATCHLIST_SESSION_TOKEN=<session-cookie-value> \
-  -- npx -y github:dexstandard/fincobra-mcp
+claude mcp add fincobra -- npx -y fincobra-mcp
 ```
 
-Or add the same `mcpServers` object to `.mcp.json` / `~/.claude.json`.
-
-## Codex
+### Codex
 
 ```bash
-codex mcp add fincobra \
-  --env FINCOBRA_CHECKOUT_API_KEY=fc_live_... \
-  --env FINCOBRA_WATCHLIST_SESSION_TOKEN=<session-cookie-value> \
-  -- npx -y github:dexstandard/fincobra-mcp
+codex mcp add fincobra -- npx -y fincobra-mcp
 ```
 
-Or in `~/.codex/config.toml`:
+Or add this to `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.fincobra]
 command = "npx"
-args = ["-y", "github:dexstandard/fincobra-mcp"]
-
-[mcp_servers.fincobra.env]
-FINCOBRA_CHECKOUT_API_KEY = "fc_live_..."
-FINCOBRA_WATCHLIST_SESSION_TOKEN = "<session-cookie-value>"
+args = ["-y", "fincobra-mcp"]
 ```
 
-## Run locally
+## Environment variables
+
+| Variable                                          | Required | Description                                                         |
+| ------------------------------------------------- | -------- | ------------------------------------------------------------------- |
+| `FINCOBRA_CHECKOUT_API_KEY` or `FINCOBRA_API_KEY` | No       | Optional Checkout dashboard API key.                                |
+| `FINCOBRA_CHECKOUT_BASE_URL`                      | No       | Checkout origin. Defaults to `https://fincobra.com`.                |
+| `FINCOBRA_WATCHLIST_BASE_URL`                     | No       | Watchlist origin. Defaults to `https://watch.fincobra.com`.         |
+| `FINCOBRA_AUTH_BASE_URL`                          | No       | Browser login API origin. Defaults to `https://watch.fincobra.com`. |
+| `FINCOBRA_CONFIG_DIR`                             | No       | Override the local directory for the saved CLI credential.          |
+
+## Development
 
 ```bash
 npm install
-FINCOBRA_CHECKOUT_API_KEY=fc_live_... \
-FINCOBRA_WATCHLIST_SESSION_TOKEN=... \
-npm start
-```
-
-The process speaks MCP over stdio. Do not write application logs to stdout.
-
-## Smoke test
-
-```bash
-FINCOBRA_CHECKOUT_API_KEY=fc_live_... \
-FINCOBRA_WATCHLIST_SESSION_TOKEN=... \
-npm run smoke
-```
-
-Unit tests mock the APIs and do not need credentials:
-
-```bash
 npm test
+npm run lint
+npm run build
 ```
 
-## Auth
-
-| Surface | Credential | Header / cookie |
-| --- | --- | --- |
-| Checkout | Dashboard API key (`fc_live_...`) | `X-Api-Key` |
-| Watchlist | Identity session cookie (`session`) | `Cookie: session=...` |
-
-Copy the Watchlist `session` cookie from a signed-in browser (DevTools → Application → Cookies). Keep keys and session tokens in MCP server env, not in chat.
-
-## API
-
-Checkout:
-
-- `POST /api/checkout/invoices`
-- `GET /api/checkout/invoices/:id`
-- Auth: `X-Api-Key`
-
-Watchlist:
-
-- `GET /api/watchlist/wallets`
-- `GET /api/watchlist/exchanges`
-- `GET /api/watchlist/manual-assets`
-- `GET /api/watchlist/fx-rates`
-- Auth: `Cookie: session=...`
-
-Send the payer to `paymentUrl`. Treat `confirmed` and `paid_out_of_band` as paid. Treat `payment_detected` as pending unless you accept unconfirmed crypto payments.
+The process speaks MCP over stdio. It does not write application logs to stdout.
 
 ## License
 

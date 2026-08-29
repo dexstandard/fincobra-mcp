@@ -11,7 +11,6 @@ import type {
 const DEFAULT_BASE_URL = 'https://watch.fincobra.com';
 const REQUEST_TIMEOUT_MS = 30_000;
 const USER_AGENT = 'fincobra-mcp/0.1.0';
-const SESSION_COOKIE_NAME = 'session';
 
 const MANUAL_NET_WORTH_NOTES = [
   'Banks, cash, and property values are manual Watchlist entries, not live bank or title feeds.',
@@ -21,10 +20,10 @@ const MANUAL_NET_WORTH_NOTES = [
 export function createWatchlistClient(
   config: WatchlistClientConfig,
 ): WatchlistClient {
-  const sessionToken = normalizeSessionToken(config.sessionToken);
-  if (sessionToken.length === 0) {
+  const accessToken = normalizeAccessToken(config.accessToken);
+  if (accessToken.length === 0) {
     throw new Error(
-      'Watchlist session token is empty. Set FINCOBRA_WATCHLIST_SESSION_TOKEN to the Identity session cookie from a signed-in Watchlist browser.',
+      'FinCobra login is missing. Run `npx -y fincobra-mcp login`.',
     );
   }
 
@@ -33,7 +32,7 @@ export function createWatchlistClient(
 
   return {
     async listSources() {
-      return listWatchlistSources(fetchImpl, baseUrl, sessionToken);
+      return listWatchlistSources(fetchImpl, baseUrl, accessToken);
     },
     async getSource(sourceId) {
       const id = sourceId.trim();
@@ -44,7 +43,7 @@ export function createWatchlistClient(
       const sources = await listWatchlistSources(
         fetchImpl,
         baseUrl,
-        sessionToken,
+        accessToken,
       );
       const match = sources.find((source) => source.id === id);
       if (!match) {
@@ -56,7 +55,7 @@ export function createWatchlistClient(
       const sources = await listWatchlistSources(
         fetchImpl,
         baseUrl,
-        sessionToken,
+        accessToken,
       );
       return buildNetWorth(sources);
     },
@@ -66,22 +65,22 @@ export function createWatchlistClient(
 async function listWatchlistSources(
   fetchImpl: WatchlistFetch,
   baseUrl: string,
-  sessionToken: string,
+  accessToken: string,
 ): Promise<WatchlistSource[]> {
   const [walletsPayload, exchangesPayload, manualsPayload, fxPayload] =
     await Promise.all([
-      requestJson(fetchImpl, baseUrl, sessionToken, '/api/watchlist/wallets'),
-      requestJson(fetchImpl, baseUrl, sessionToken, '/api/watchlist/exchanges'),
+      requestJson(fetchImpl, baseUrl, accessToken, '/api/watchlist/wallets'),
+      requestJson(fetchImpl, baseUrl, accessToken, '/api/watchlist/exchanges'),
       requestJson(
         fetchImpl,
         baseUrl,
-        sessionToken,
+        accessToken,
         '/api/watchlist/manual-assets',
       ),
       requestJson(
         fetchImpl,
         baseUrl,
-        sessionToken,
+        accessToken,
         '/api/watchlist/fx-rates',
       ).catch(() => null),
     ]);
@@ -150,7 +149,7 @@ function buildNetWorth(sources: WatchlistSource[]): WatchlistNetWorth {
 async function requestJson(
   fetchImpl: WatchlistFetch,
   baseUrl: string,
-  sessionToken: string,
+  accessToken: string,
   path: string,
 ): Promise<unknown> {
   let response: Response;
@@ -159,7 +158,7 @@ async function requestJson(
       method: 'GET',
       headers: {
         Accept: 'application/json',
-        Cookie: `${SESSION_COOKIE_NAME}=${sessionToken}`,
+        Authorization: `Bearer ${accessToken}`,
         'User-Agent': USER_AGENT,
       },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -189,7 +188,7 @@ function formatWatchlistHttpError(
   const apiMessage = readApiErrorMessage(payload);
 
   if (statusCode === 403 || statusCode === 401) {
-    return `${apiMessage ?? 'forbidden'}. Set FINCOBRA_WATCHLIST_SESSION_TOKEN to a valid Identity session cookie from a signed-in Watchlist browser.`;
+    return `${apiMessage ?? 'FinCobra login expired'}. Run \`npx -y fincobra-mcp login\` again.`;
   }
 
   return apiMessage ?? `Watchlist request failed with HTTP ${statusCode}`;
@@ -332,11 +331,8 @@ function convertCurrencyToUsd(
   return value / rate;
 }
 
-function normalizeSessionToken(value: string): string {
-  return value
-    .trim()
-    .replace(/^session=/i, '')
-    .trim();
+function normalizeAccessToken(value: string): string {
+  return value.trim();
 }
 
 async function readJsonBody(response: Response): Promise<unknown> {

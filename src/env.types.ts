@@ -1,10 +1,11 @@
 export interface CheckoutMcpEnv {
-  apiKey: string;
+  apiKey?: string;
+  accessToken?: string;
   baseUrl: string;
 }
 
 export interface WatchlistMcpEnv {
-  sessionToken: string;
+  accessToken: string;
   baseUrl: string;
 }
 

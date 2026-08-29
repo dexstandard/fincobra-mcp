@@ -75,11 +75,9 @@ describe('watchlist MCP tools', () => {
     expect(result.structuredContent).toEqual(source);
   });
 
-  it('explains missing Watchlist session config', async () => {
+  it('explains how to sign in when Watchlist is not configured', async () => {
     const result = await handleGetNetWorth(undefined);
     expect(result.isError).toBe(true);
-    expect(result.content[0]?.text).toContain(
-      'FINCOBRA_WATCHLIST_SESSION_TOKEN',
-    );
+    expect(result.content[0]?.text).toContain('npx -y fincobra-mcp login');
   });
 });

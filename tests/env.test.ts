@@ -5,36 +5,49 @@ import {
   readFincobraMcpEnv,
 } from '../src/env.js';
 
+const credential = {
+  version: 1 as const,
+  authBaseUrl: 'https://watch.fincobra.com',
+  accessToken: 'fcm_test',
+  expiresAt: '2026-12-01T00:00:00.000Z',
+  accountLabel: 'user@example.com',
+};
+
 describe('readFincobraMcpEnv', () => {
-  it('accepts checkout only, watchlist only, or both', () => {
+  it('accepts an API key, a browser login, or both', () => {
     expect(
       readFincobraMcpEnv({
         FINCOBRA_CHECKOUT_API_KEY: 'fc_live_checkout',
       }).watchlist,
     ).toBeNull();
 
-    expect(
-      readFincobraMcpEnv({
-        FINCOBRA_WATCHLIST_SESSION_TOKEN: 'session-token',
-      }).checkout,
-    ).toBeNull();
+    expect(readFincobraMcpEnv({}, credential).checkout).toEqual({
+      accessToken: 'fcm_test',
+      baseUrl: 'https://fincobra.com',
+    });
 
-    const both = readFincobraMcpEnv({
-      FINCOBRA_CHECKOUT_API_KEY: 'fc_live_checkout',
-      FINCOBRA_WATCHLIST_SESSION_TOKEN: 'session-token',
-      FINCOBRA_WATCHLIST_BASE_URL: 'https://watch.dev.fincobra.com/',
+    const both = readFincobraMcpEnv(
+      {
+        FINCOBRA_CHECKOUT_API_KEY: 'fc_live_checkout',
+        FINCOBRA_WATCHLIST_BASE_URL: 'https://watch.dev.fincobra.com/',
+      },
+      credential,
+    );
+    expect(both.checkout).toEqual({
+      apiKey: 'fc_live_checkout',
+      baseUrl: 'https://fincobra.com',
     });
     expect(both.watchlist).toEqual({
-      sessionToken: 'session-token',
+      accessToken: 'fcm_test',
       baseUrl: 'https://watch.dev.fincobra.com',
     });
   });
 
-  it('requires at least one surface', () => {
-    expect(() => readFincobraMcpEnv({})).toThrow(CheckoutMcpEnvError);
-    expect(() => readFincobraMcpEnv({})).toThrow(
-      'FINCOBRA_CHECKOUT_API_KEY and/or FINCOBRA_WATCHLIST_SESSION_TOKEN',
-    );
+  it('starts without credentials so MCP tools can explain how to sign in', () => {
+    expect(readFincobraMcpEnv({})).toEqual({
+      checkout: null,
+      watchlist: null,
+    });
   });
 });
 
@@ -71,10 +84,20 @@ describe('readCheckoutMcpEnv', () => {
     ).toBe('fc_live_checkout');
   });
 
-  it('requires an API key', () => {
+  it('prefers an API key over a browser login', () => {
+    expect(
+      readCheckoutMcpEnv(
+        { FINCOBRA_CHECKOUT_API_KEY: 'fc_live_checkout' },
+        credential,
+      ),
+    ).toEqual({
+      apiKey: 'fc_live_checkout',
+      baseUrl: 'https://fincobra.com',
+    });
+  });
+
+  it('requires Checkout authentication', () => {
     expect(() => readCheckoutMcpEnv({})).toThrow(CheckoutMcpEnvError);
-    expect(() => readCheckoutMcpEnv({})).toThrow(
-      'FINCOBRA_CHECKOUT_API_KEY is required',
-    );
+    expect(() => readCheckoutMcpEnv({})).toThrow('npx -y fincobra-mcp login');
   });
 });
