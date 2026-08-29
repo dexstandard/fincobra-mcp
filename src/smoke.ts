@@ -9,6 +9,7 @@ async function main(): Promise<void> {
   if (env.checkout) {
     const client = createCheckoutClient({
       apiKey: env.checkout.apiKey,
+      sessionToken: env.checkout.sessionToken,
       baseUrl: env.checkout.baseUrl,
     });
     const created = await client.createInvoice({

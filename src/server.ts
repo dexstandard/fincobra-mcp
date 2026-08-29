@@ -8,8 +8,7 @@ import {
   handleListSources,
 } from './tools.js';
 import type { CheckoutMcpServerOptions } from './server.types.js';
-
-const PACKAGE_VERSION = '0.1.0';
+import { FINCOBRA_MCP_VERSION } from './version.js';
 
 const invoiceSummarySchema = z.object({
   id: z.string(),
@@ -108,7 +107,7 @@ export function createFincobraMcpServer(
   const checkoutClient = options.checkoutClient ?? options.client;
   const server = new McpServer({
     name: 'fincobra',
-    version: PACKAGE_VERSION,
+    version: FINCOBRA_MCP_VERSION,
   });
 
   server.registerTool(

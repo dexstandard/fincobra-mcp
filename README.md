@@ -1,16 +1,39 @@
 # FinCobra MCP — crypto checkout for Claude, Cursor, and Codex
 
-[Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for FinCobra crypto checkout and payments. Create hosted invoices for BTC, USDT, and USDC (settlement assets come from dashboard payment methods; amounts are USD). Works with Claude Code, Cursor, and Codex. Watchlist access is read-only. Not on npm yet — install from GitHub.
+[Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for FinCobra Checkout and read-only Watchlist data. Create hosted invoices for BTC, USDT, and USDC. Settlement assets come from dashboard payment methods, and invoice amounts are USD. Works with Claude Code, Cursor, and Codex.
 
 Docs: [FinCobra Checkout MCP](https://fincobra.com/docs/checkout/mcp.html)
 
-`fincobra-mcp` 0.1.0 is **not published to npm yet**. Until it is, install from GitHub:
+## Quick start
+
+You need Node.js 20 or later, a FinCobra account, and at least one FinCobra credential. `npx` installs the server on first use. You do not need a global install.
+
+1. Install the package and show the setup guide. This command does not need a FinCobra account or credential:
 
 ```bash
-npx -y github:dexstandard/fincobra-mcp
+npx -y fincobra-mcp --help
 ```
 
-Pin a source release with `npx -y github:dexstandard/fincobra-mcp#v0.1.0`. Requires Node.js 20+.
+2. [Create or sign in to your FinCobra account](https://fincobra.com/checkout/settings).
+
+3. Configure at least one credential in your MCP client environment:
+
+| Surface | Preferred variable | Alternative | Where to get it |
+| --- | --- | --- | --- |
+| Checkout | `FINCOBRA_CHECKOUT_API_KEY` | `FINCOBRA_CHECKOUT_SESSION_TOKEN` | Create an API key in [Checkout settings](https://fincobra.com/checkout/settings), or use the Identity `session` cookie from a signed-in browser. |
+| Watchlist | `FINCOBRA_WATCHLIST_SESSION_TOKEN` | `FINCOBRA_SESSION_TOKEN` | Use the Identity `session` cookie from [Watchlist](https://watch.fincobra.com). |
+
+`FINCOBRA_SESSION_TOKEN` can authenticate both Checkout and Watchlist. A Checkout API key is preferred for durable automation. A browser session has wider account access and expires when the Identity session expires.
+
+4. Set the MCP server command to:
+
+```bash
+npx -y fincobra-mcp
+```
+
+5. Restart your MCP client. Keep credentials in the client environment or secret settings. Do not put them in chat.
+
+Pin a release with `npx -y fincobra-mcp@0.1.2`. Run `npx -y fincobra-mcp --version` to show the installed version.
 
 - Checkout: create a hosted payment invoice and read its status
 - Watchlist: read-only source list and manual net-worth breakdown
@@ -52,13 +75,14 @@ Banks, cash, and property are manual product entries, not live bank or title fee
 
 Watchlist tools do not add wallets, edit banks, change billing, or export taxes.
 
-## Environment
+## Environment variables
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `FINCOBRA_CHECKOUT_API_KEY` or `FINCOBRA_API_KEY` | One of the two surfaces | Checkout dashboard API key (`fc_live_...`). The Checkout-specific name is preferred when both are set. |
+| `FINCOBRA_CHECKOUT_API_KEY` or `FINCOBRA_API_KEY` | One Checkout credential | Checkout dashboard API key (`fc_live_...`). The Checkout-specific name is preferred. |
+| `FINCOBRA_CHECKOUT_SESSION_TOKEN` | One Checkout credential | Identity `session` cookie value for interactive local use. The API key is preferred when both are set. |
 | `FINCOBRA_CHECKOUT_BASE_URL` | No | Checkout origin. Defaults to `https://fincobra.com`. |
-| `FINCOBRA_WATCHLIST_SESSION_TOKEN` or `FINCOBRA_SESSION_TOKEN` | One of the two surfaces | Identity `session` cookie value. The Watchlist-specific name is preferred when both are set. |
+| `FINCOBRA_WATCHLIST_SESSION_TOKEN` or `FINCOBRA_SESSION_TOKEN` | One Watchlist credential | Identity `session` cookie value. The Watchlist-specific name is preferred. `FINCOBRA_SESSION_TOKEN` also authenticates Checkout when no Checkout API key or Checkout-specific session is set. |
 | `FINCOBRA_WATCHLIST_BASE_URL` | No | Watchlist origin. Defaults to `https://watch.fincobra.com`. |
 
 Configure Checkout, Watchlist, or both. Tools for a missing surface return a configuration error.
@@ -74,7 +98,7 @@ Add to `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (user):
   "mcpServers": {
     "fincobra": {
       "command": "npx",
-      "args": ["-y", "github:dexstandard/fincobra-mcp"],
+      "args": ["-y", "fincobra-mcp"],
       "env": {
         "FINCOBRA_CHECKOUT_API_KEY": "fc_live_...",
         "FINCOBRA_CHECKOUT_BASE_URL": "https://fincobra.com",
@@ -90,32 +114,30 @@ Add to `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (user):
 
 ```bash
 claude mcp add fincobra \
-  --env FINCOBRA_CHECKOUT_API_KEY=fc_live_... \
-  --env FINCOBRA_WATCHLIST_SESSION_TOKEN=<session-cookie-value> \
-  -- npx -y github:dexstandard/fincobra-mcp
+  --env FINCOBRA_CHECKOUT_API_KEY=fc_live_replace_me \
+  -- npx -y fincobra-mcp
 ```
 
-Or add the same `mcpServers` object to `.mcp.json` / `~/.claude.json`.
+Use `FINCOBRA_SESSION_TOKEN=replace_with_session_cookie` instead to connect both surfaces with a signed-in session. Or add the same `mcpServers` object to `.mcp.json` / `~/.claude.json`.
 
 ## Codex
 
 ```bash
 codex mcp add fincobra \
-  --env FINCOBRA_CHECKOUT_API_KEY=fc_live_... \
-  --env FINCOBRA_WATCHLIST_SESSION_TOKEN=<session-cookie-value> \
-  -- npx -y github:dexstandard/fincobra-mcp
+  --env FINCOBRA_CHECKOUT_API_KEY=fc_live_replace_me \
+  -- npx -y fincobra-mcp
 ```
 
-Or in `~/.codex/config.toml`:
+Use `FINCOBRA_SESSION_TOKEN=replace_with_session_cookie` instead to connect both surfaces with a signed-in session. Or add the server in Codex settings. In `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.fincobra]
 command = "npx"
-args = ["-y", "github:dexstandard/fincobra-mcp"]
+args = ["-y", "fincobra-mcp"]
 
 [mcp_servers.fincobra.env]
 FINCOBRA_CHECKOUT_API_KEY = "fc_live_..."
-FINCOBRA_WATCHLIST_SESSION_TOKEN = "<session-cookie-value>"
+FINCOBRA_SESSION_TOKEN = "replace_with_session_cookie"
 ```
 
 ## Run locally
@@ -148,9 +170,10 @@ npm test
 | Surface | Credential | Header / cookie |
 | --- | --- | --- |
 | Checkout | Dashboard API key (`fc_live_...`) | `X-Api-Key` |
+| Checkout | Identity session | `Cookie: session=...` with the Checkout origin on writes |
 | Watchlist | Identity session cookie (`session`) | `Cookie: session=...` |
 
-Copy the Watchlist `session` cookie from a signed-in browser (DevTools → Application → Cookies). Keep keys and session tokens in MCP server env, not in chat.
+Copy the `session` cookie from a signed-in FinCobra browser only when you choose session authentication (DevTools → Application → Cookies). Keep keys and session tokens in the MCP server environment, not in chat. Prefer a Checkout API key for long-running automation.
 
 ## API
 

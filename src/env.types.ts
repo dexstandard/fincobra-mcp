@@ -1,5 +1,6 @@
 export interface CheckoutMcpEnv {
-  apiKey: string;
+  apiKey?: string;
+  sessionToken?: string;
   baseUrl: string;
 }
 

@@ -4,10 +4,15 @@ import type {
   CheckoutFetch,
   CheckoutInvoiceSummary,
 } from './checkout-client.types.js';
+import { FINCOBRA_MCP_VERSION } from './version.js';
 
 const DEFAULT_BASE_URL = 'https://fincobra.com';
 const REQUEST_TIMEOUT_MS = 30_000;
-const USER_AGENT = 'fincobra-mcp/0.1.0';
+const USER_AGENT = `fincobra-mcp/${FINCOBRA_MCP_VERSION}`;
+
+type CheckoutAuth =
+  | { type: 'api_key'; value: string }
+  | { type: 'session'; value: string };
 
 export class CheckoutApiError extends Error {
   statusCode: number;
@@ -22,10 +27,10 @@ export class CheckoutApiError extends Error {
 export function createCheckoutClient(
   config: CheckoutClientConfig,
 ): CheckoutClient {
-  const apiKey = config.apiKey.trim();
-  if (apiKey.length === 0) {
+  const auth = resolveCheckoutAuth(config);
+  if (!auth) {
     throw new Error(
-      'Checkout API key is empty. Set FINCOBRA_CHECKOUT_API_KEY to a key from the Checkout dashboard.',
+      'Checkout authentication is missing. Set FINCOBRA_CHECKOUT_API_KEY or FINCOBRA_CHECKOUT_SESSION_TOKEN.',
     );
   }
 
@@ -35,7 +40,7 @@ export function createCheckoutClient(
   return {
     createInvoice(input) {
       return requestInvoice(fetchImpl, {
-        apiKey,
+        auth,
         baseUrl,
         method: 'POST',
         path: '/api/checkout/invoices',
@@ -60,7 +65,7 @@ export function createCheckoutClient(
       }
 
       return requestInvoice(fetchImpl, {
-        apiKey,
+        auth,
         baseUrl,
         method: 'GET',
         path: `/api/checkout/invoices/${encodeURIComponent(id)}`,
@@ -70,7 +75,7 @@ export function createCheckoutClient(
 }
 
 interface RequestInvoiceOptions {
-  apiKey: string;
+  auth: CheckoutAuth;
   baseUrl: string;
   method: 'GET' | 'POST';
   path: string;
@@ -87,7 +92,7 @@ async function requestInvoice(
       method: options.method,
       headers: {
         Accept: 'application/json',
-        'X-Api-Key': options.apiKey,
+        ...checkoutAuthHeaders(options.auth, options.baseUrl),
         'User-Agent': USER_AGENT,
         ...(options.body === undefined
           ? {}
@@ -108,18 +113,59 @@ async function requestInvoice(
   if (!response.ok) {
     throw new CheckoutApiError(
       response.status,
-      formatCheckoutHttpError(response.status, payload),
+      formatCheckoutHttpError(response.status, payload, options.auth.type),
     );
   }
 
   return toInvoiceSummary(payload);
 }
 
-function formatCheckoutHttpError(statusCode: number, payload: unknown): string {
+function resolveCheckoutAuth(
+  config: CheckoutClientConfig,
+): CheckoutAuth | null {
+  const apiKey = normalizeCredential(config.apiKey);
+  if (apiKey) {
+    return { type: 'api_key', value: apiKey };
+  }
+
+  const sessionToken = normalizeCredential(config.sessionToken);
+  return sessionToken ? { type: 'session', value: sessionToken } : null;
+}
+
+function checkoutAuthHeaders(
+  auth: CheckoutAuth,
+  baseUrl: string,
+): Record<string, string> {
+  if (auth.type === 'api_key') {
+    return { 'X-Api-Key': auth.value };
+  }
+
+  return {
+    Cookie: `session=${auth.value}`,
+    Origin: new URL(baseUrl).origin,
+  };
+}
+
+function normalizeCredential(value: string | undefined): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function formatCheckoutHttpError(
+  statusCode: number,
+  payload: unknown,
+  authType: CheckoutAuth['type'],
+): string {
   const apiMessage = readApiErrorMessage(payload);
 
   if (statusCode === 401) {
-    return `${apiMessage ?? 'Invalid API key'}. Set FINCOBRA_CHECKOUT_API_KEY to a valid Checkout API key.`;
+    return authType === 'api_key'
+      ? `${apiMessage ?? 'Invalid API key'}. Set FINCOBRA_CHECKOUT_API_KEY to a valid Checkout API key.`
+      : `${apiMessage ?? 'Invalid session'}. Sign in again and update FINCOBRA_CHECKOUT_SESSION_TOKEN.`;
   }
 
   if (apiMessage) {

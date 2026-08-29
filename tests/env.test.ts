@@ -30,10 +30,27 @@ describe('readFincobraMcpEnv', () => {
     });
   });
 
+  it('accepts a Checkout session and shares the generic session token', () => {
+    expect(
+      readFincobraMcpEnv({
+        FINCOBRA_CHECKOUT_SESSION_TOKEN: 'checkout-session',
+      }).checkout,
+    ).toEqual({
+      sessionToken: 'checkout-session',
+      baseUrl: 'https://fincobra.com',
+    });
+
+    const shared = readFincobraMcpEnv({
+      FINCOBRA_SESSION_TOKEN: 'shared-session',
+    });
+    expect(shared.checkout?.sessionToken).toBe('shared-session');
+    expect(shared.watchlist?.sessionToken).toBe('shared-session');
+  });
+
   it('requires at least one surface', () => {
     expect(() => readFincobraMcpEnv({})).toThrow(CheckoutMcpEnvError);
     expect(() => readFincobraMcpEnv({})).toThrow(
-      'FINCOBRA_CHECKOUT_API_KEY and/or FINCOBRA_WATCHLIST_SESSION_TOKEN',
+      'FinCobra MCP is installed, but it is not connected to a FinCobra account.',
     );
   });
 });
@@ -71,10 +88,22 @@ describe('readCheckoutMcpEnv', () => {
     ).toBe('fc_live_checkout');
   });
 
-  it('requires an API key', () => {
+  it('prefers an API key over a Checkout session', () => {
+    expect(
+      readCheckoutMcpEnv({
+        FINCOBRA_CHECKOUT_API_KEY: 'fc_live_checkout',
+        FINCOBRA_CHECKOUT_SESSION_TOKEN: 'checkout-session',
+      }),
+    ).toEqual({
+      apiKey: 'fc_live_checkout',
+      baseUrl: 'https://fincobra.com',
+    });
+  });
+
+  it('requires Checkout authentication', () => {
     expect(() => readCheckoutMcpEnv({})).toThrow(CheckoutMcpEnvError);
     expect(() => readCheckoutMcpEnv({})).toThrow(
-      'FINCOBRA_CHECKOUT_API_KEY is required',
+      'FINCOBRA_CHECKOUT_API_KEY or FINCOBRA_CHECKOUT_SESSION_TOKEN is required',
     );
   });
 });

@@ -1,15 +1,33 @@
 #!/usr/bin/env node
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
+import { getCliHelp } from './cli-help.js';
 import { createCheckoutClient } from './checkout-client.js';
 import { CheckoutMcpEnvError, readFincobraMcpEnv } from './env.js';
 import { createFincobraMcpServer } from './server.js';
+import { FINCOBRA_MCP_VERSION } from './version.js';
 import { createWatchlistClient } from './watchlist-client.js';
 
 function main(): void {
+  const command = process.argv[2];
+  if (command === '--help' || command === '-h' || command === 'help') {
+    process.stdout.write(getCliHelp());
+    return;
+  }
+  if (command === '--version' || command === '-v' || command === 'version') {
+    process.stdout.write(`${FINCOBRA_MCP_VERSION}\n`);
+    return;
+  }
+  if (command !== undefined) {
+    throw new Error(
+      `Unknown option: ${command}. Run \`npx -y fincobra-mcp --help\` for usage.`,
+    );
+  }
+
   const env = readFincobraMcpEnv();
   const checkoutClient = env.checkout
     ? createCheckoutClient({
         apiKey: env.checkout.apiKey,
+        sessionToken: env.checkout.sessionToken,
         baseUrl: env.checkout.baseUrl,
       })
     : undefined;

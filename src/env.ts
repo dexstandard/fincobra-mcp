@@ -1,4 +1,5 @@
 import { normalizeBaseUrl } from './checkout-client.js';
+import { getMissingAuthMessage } from './cli-help.js';
 import type {
   CheckoutMcpEnv,
   FincobraMcpEnv,
@@ -21,9 +22,7 @@ export function readFincobraMcpEnv(
   const checkout = readCheckoutEnv(env);
   const watchlist = readWatchlistEnv(env);
   if (!checkout && !watchlist) {
-    throw new CheckoutMcpEnvError(
-      'Set FINCOBRA_CHECKOUT_API_KEY and/or FINCOBRA_WATCHLIST_SESSION_TOKEN. Checkout uses a dashboard API key. Watchlist has no public API key and uses the Identity session cookie from a signed-in Watchlist browser.',
-    );
+    throw new CheckoutMcpEnvError(getMissingAuthMessage());
   }
 
   return { checkout, watchlist };
@@ -35,7 +34,7 @@ export function readCheckoutMcpEnv(
   const checkout = readCheckoutEnv(env);
   if (!checkout) {
     throw new CheckoutMcpEnvError(
-      'FINCOBRA_CHECKOUT_API_KEY is required. Create a Checkout API key in the dashboard and set it in your MCP server env.',
+      'FINCOBRA_CHECKOUT_API_KEY or FINCOBRA_CHECKOUT_SESSION_TOKEN is required. Set one in your MCP server environment.',
     );
   }
 
@@ -47,17 +46,22 @@ function readCheckoutEnv(env: NodeJS.ProcessEnv): CheckoutMcpEnv | null {
     env.FINCOBRA_CHECKOUT_API_KEY,
     env.FINCOBRA_API_KEY,
   );
-  if (!apiKey) {
-    return null;
+  const sessionToken = firstNonEmpty(
+    env.FINCOBRA_CHECKOUT_SESSION_TOKEN,
+    env.FINCOBRA_SESSION_TOKEN,
+  );
+  const configuredBaseUrl = firstNonEmpty(env.FINCOBRA_CHECKOUT_BASE_URL);
+  const baseUrl = configuredBaseUrl
+    ? normalizeBaseUrl(configuredBaseUrl)
+    : DEFAULT_CHECKOUT_BASE_URL;
+  if (apiKey) {
+    return { apiKey, baseUrl };
+  }
+  if (sessionToken) {
+    return { sessionToken, baseUrl };
   }
 
-  const configuredBaseUrl = firstNonEmpty(env.FINCOBRA_CHECKOUT_BASE_URL);
-  return {
-    apiKey,
-    baseUrl: configuredBaseUrl
-      ? normalizeBaseUrl(configuredBaseUrl)
-      : DEFAULT_CHECKOUT_BASE_URL,
-  };
+  return null;
 }
 
 function readWatchlistEnv(env: NodeJS.ProcessEnv): WatchlistMcpEnv | null {

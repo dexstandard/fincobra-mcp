@@ -1,5 +1,6 @@
 export interface CheckoutClientConfig {
-  apiKey: string;
+  apiKey?: string;
+  sessionToken?: string;
   baseUrl?: string;
   fetchImpl?: CheckoutFetch;
 }
