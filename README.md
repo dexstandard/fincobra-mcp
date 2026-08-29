@@ -1,16 +1,22 @@
 # FinCobra MCP — crypto checkout for Claude, Cursor, and Codex
 
-[Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for FinCobra crypto checkout and payments. Create hosted invoices for BTC, USDT, and USDC (settlement assets come from dashboard payment methods; amounts are USD). Works with Claude Code, Cursor, and Codex. Watchlist access is read-only. Not on npm yet — install from GitHub.
+[Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for FinCobra crypto checkout and payments. Create hosted invoices for BTC, USDT, and USDC (settlement assets come from dashboard payment methods; amounts are USD). Works with Claude Code, Cursor, and Codex. Watchlist access is read-only.
 
 Docs: [FinCobra Checkout MCP](https://fincobra.com/docs/checkout/mcp.html)
 
-`fincobra-mcp` 0.1.0 is **not published to npm yet**. Until it is, install from GitHub:
+```bash
+npx -y fincobra-mcp
+```
+
+Pin a release with `npx -y fincobra-mcp@0.1.0`. Requires Node.js 20+.
+
+From GitHub:
 
 ```bash
 npx -y github:dexstandard/fincobra-mcp
 ```
 
-Pin a source release with `npx -y github:dexstandard/fincobra-mcp#v0.1.0`. Requires Node.js 20+.
+Pin a source release with `npx -y github:dexstandard/fincobra-mcp#v0.1.0`.
 
 - Checkout: create a hosted payment invoice and read its status
 - Watchlist: read-only source list and manual net-worth breakdown
@@ -74,7 +80,7 @@ Add to `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (user):
   "mcpServers": {
     "fincobra": {
       "command": "npx",
-      "args": ["-y", "github:dexstandard/fincobra-mcp"],
+      "args": ["-y", "fincobra-mcp"],
       "env": {
         "FINCOBRA_CHECKOUT_API_KEY": "fc_live_...",
         "FINCOBRA_CHECKOUT_BASE_URL": "https://fincobra.com",
@@ -86,13 +92,15 @@ Add to `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (user):
 }
 ```
 
+GitHub alternative: `["-y", "github:dexstandard/fincobra-mcp"]`.
+
 ## Claude Code
 
 ```bash
 claude mcp add fincobra \
   --env FINCOBRA_CHECKOUT_API_KEY=fc_live_... \
   --env FINCOBRA_WATCHLIST_SESSION_TOKEN=<session-cookie-value> \
-  -- npx -y github:dexstandard/fincobra-mcp
+  -- npx -y fincobra-mcp
 ```
 
 Or add the same `mcpServers` object to `.mcp.json` / `~/.claude.json`.
@@ -103,7 +111,7 @@ Or add the same `mcpServers` object to `.mcp.json` / `~/.claude.json`.
 codex mcp add fincobra \
   --env FINCOBRA_CHECKOUT_API_KEY=fc_live_... \
   --env FINCOBRA_WATCHLIST_SESSION_TOKEN=<session-cookie-value> \
-  -- npx -y github:dexstandard/fincobra-mcp
+  -- npx -y fincobra-mcp
 ```
 
 Or in `~/.codex/config.toml`:
@@ -111,7 +119,7 @@ Or in `~/.codex/config.toml`:
 ```toml
 [mcp_servers.fincobra]
 command = "npx"
-args = ["-y", "github:dexstandard/fincobra-mcp"]
+args = ["-y", "fincobra-mcp"]
 
 [mcp_servers.fincobra.env]
 FINCOBRA_CHECKOUT_API_KEY = "fc_live_..."
