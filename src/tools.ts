@@ -5,6 +5,7 @@ import type {
 } from './checkout-client.types.js';
 import type {
   CheckoutMcpToolResult,
+  AddWatchlistCarToolInput,
   CreateInvoiceToolInput,
   GetInvoiceToolInput,
   GetWatchlistSourceInput,
@@ -95,6 +96,21 @@ export async function handleGetSource(
 
   try {
     return successResult(await client.getSource(input.sourceId));
+  } catch (err: unknown) {
+    return errorResult(err);
+  }
+}
+
+export async function handleAddCar(
+  client: WatchlistClient | undefined,
+  input: AddWatchlistCarToolInput,
+): Promise<CheckoutMcpToolResult> {
+  if (!client) {
+    return errorResult(WATCHLIST_NOT_CONFIGURED);
+  }
+
+  try {
+    return successResult(await client.addCar(input));
   } catch (err: unknown) {
     return errorResult(err);
   }

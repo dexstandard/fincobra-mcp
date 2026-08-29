@@ -1,6 +1,6 @@
 # FinCobra MCP — crypto checkout for Claude, Cursor, and Codex
 
-[Model Context Protocol](https://modelcontextprotocol.io) server for FinCobra Checkout and read-only Watchlist data. It creates hosted BTC, USDT, and USDC invoices and reads the sources in your FinCobra Watchlist.
+[Model Context Protocol](https://modelcontextprotocol.io) server for FinCobra Checkout and Watchlist. It creates hosted BTC, USDT, and USDC invoices, reads live Watchlist balances, and can add a car as a manual asset.
 
 Docs: [FinCobra Checkout MCP](https://fincobra.com/docs/checkout/mcp.html)
 
@@ -38,17 +38,18 @@ npx -y fincobra-mcp status
 npx -y fincobra-mcp logout
 ```
 
-Pin this release with `npx -y fincobra-mcp@0.2.0`.
+Pin this release with `npx -y fincobra-mcp@0.3.0`.
 
 ## Access model
 
 Browser login gives the CLI a dedicated credential with only these approved scopes:
 
-| Scope            | Access                                                                |
-| ---------------- | --------------------------------------------------------------------- |
-| `watchlist:read` | Read Watchlist wallets, exchanges, manual assets, and exchange rates. |
-| `checkout:read`  | Read a Checkout invoice by its invoice ID.                            |
-| `checkout:write` | Create a Checkout invoice.                                            |
+| Scope             | Access                                                                |
+| ----------------- | --------------------------------------------------------------------- |
+| `watchlist:read`  | Read Watchlist wallets, exchanges, manual assets, and exchange rates. |
+| `watchlist:write` | Add a car as a manual Watchlist asset.                                |
+| `checkout:read`   | Read a Checkout invoice by its invoice ID.                            |
+| `checkout:write`  | Create a Checkout invoice.                                            |
 
 The CLI never reads or stores the Identity browser session cookie. The saved CLI credential expires, can be revoked with `logout`, and cannot access general account settings.
 
@@ -73,15 +74,16 @@ Invoice settlement assets come from the merchant's Checkout payment methods:
 | Arbitrum One     | USDC       |
 | Base             | USDC       |
 
-### Watchlist (read-only)
+### Watchlist
 
-| Tool            | What it does                                          |
-| --------------- | ----------------------------------------------------- |
-| `get_net_worth` | Return manual bank, cash, and property totals in USD. |
-| `list_sources`  | List wallets, exchanges, and manual assets.           |
-| `get_source`    | Read one source by the ID from `list_sources`.        |
+| Tool            | What it does                                               |
+| --------------- | ---------------------------------------------------------- |
+| `get_net_worth` | Return live crypto and manual asset totals in USD.         |
+| `list_sources`  | List wallets, exchanges, live balances, and manual assets. |
+| `get_source`    | Read one source by the ID from `list_sources`.             |
+| `add_car`       | Add a car with a name, currency, value, and optional note. |
 
-Banks, cash, and property are manual entries. Live crypto USD balances are computed in the Watchlist UI and are not returned by the current list API, so `cryptoUsd` is `null`.
+Banks, cash, property, and cars are manual entries. `cryptoUsd` and `totalNetWorthUsd` are `null` when any live crypto source is temporarily unavailable. In that case, `pricedCryptoUsd` contains the sources that were valued successfully.
 
 ## Client examples
 

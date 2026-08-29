@@ -22,7 +22,12 @@ describe('FinCobra browser auth client', () => {
     const fetchImpl = vi.fn<typeof fetch>(async (_url, init) => {
       expect(init?.method).toBe('POST');
       expect(JSON.parse(String(init?.body))).toEqual({
-        scopes: ['watchlist:read', 'checkout:read', 'checkout:write'],
+        scopes: [
+          'watchlist:read',
+          'watchlist:write',
+          'checkout:read',
+          'checkout:write',
+        ],
       });
       return jsonResponse(201, authorization);
     });

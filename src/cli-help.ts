@@ -6,7 +6,7 @@ export function getCliHelp(): string {
   return [
     `FinCobra MCP ${FINCOBRA_MCP_VERSION}`,
     '',
-    'Run FinCobra Checkout and read-only Watchlist tools in an MCP client.',
+    'Run FinCobra Checkout and Watchlist tools in an MCP client.',
     'npx installs the server on first use. A global install is not required.',
     '',
     'Setup',

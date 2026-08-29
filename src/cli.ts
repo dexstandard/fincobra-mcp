@@ -4,6 +4,7 @@ import {
   createDeviceAuthorization,
   getAuthBaseUrl,
   getSessionStatus,
+  hasRequiredLoginScopes,
   pollDeviceAuthorization,
   revokeSession,
 } from './auth-client.js';
@@ -83,10 +84,14 @@ async function login(): Promise<void> {
         existing.authBaseUrl,
         existing.accessToken,
       );
-      process.stdout.write(
-        `Already signed in to FinCobra as ${accountLabel(session.account)}.\n`,
-      );
-      return;
+      if (hasRequiredLoginScopes(session.scopes)) {
+        process.stdout.write(
+          `Already signed in to FinCobra as ${accountLabel(session.account)}.\n`,
+        );
+        return;
+      }
+      await revokeSession(existing.authBaseUrl, existing.accessToken);
+      await deleteStoredCredential();
     } catch {
       await deleteStoredCredential();
     }
@@ -132,6 +137,12 @@ async function status(): Promise<void> {
       credential.authBaseUrl,
       credential.accessToken,
     );
+    if (!hasRequiredLoginScopes(session.scopes)) {
+      process.stdout.write(
+        'The saved FinCobra login needs updated Watchlist access. Run `npx -y fincobra-mcp login` to review and approve it.\n',
+      );
+      return;
+    }
     process.stdout.write(
       `Signed in to FinCobra as ${accountLabel(session.account)}. Credential expires ${session.expiresAt}.\n`,
     );

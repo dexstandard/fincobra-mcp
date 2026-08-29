@@ -23,14 +23,19 @@ const source: WatchlistSource = {
   accountType: 'bank',
   mortgageBalance: null,
   tokenPnl: null,
+  balances: null,
+  valuationStatus: 'complete',
 };
 
 const netWorth: WatchlistNetWorth = {
   banksUsd: 100,
   cashUsd: 0,
   propertyUsd: 0,
+  carsUsd: 0,
   manualTotalUsd: 100,
-  cryptoUsd: null,
+  pricedCryptoUsd: 0,
+  cryptoUsd: 0,
+  totalNetWorthUsd: 100,
   unpricedManualAssetCount: 0,
   sourceCounts: { wallets: 0, exchanges: 0, manualAssets: 1 },
   notes: ['manual'],
@@ -47,6 +52,9 @@ describe('watchlist MCP tools', () => {
       },
       async getNetWorth() {
         return netWorth;
+      },
+      async addCar() {
+        return source;
       },
     };
 
@@ -68,6 +76,9 @@ describe('watchlist MCP tools', () => {
       },
       async getNetWorth() {
         return netWorth;
+      },
+      async addCar() {
+        return source;
       },
     };
 

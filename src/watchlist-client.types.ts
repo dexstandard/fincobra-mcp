@@ -15,9 +15,22 @@ export interface WatchlistTokenPnl {
   reliable: boolean;
 }
 
+export interface WatchlistBalance {
+  asset: string;
+  balance: number;
+  valueUsd: number | null;
+}
+
+export type WatchlistValuationStatus = 'complete' | 'partial' | 'unavailable';
+
 export interface WatchlistSource {
   id: string;
-  kind: 'wallet' | 'exchange' | 'manual_bank' | 'manual_property';
+  kind:
+    | 'wallet'
+    | 'exchange'
+    | 'manual_bank'
+    | 'manual_property'
+    | 'manual_car';
   label: string;
   blockchain: string | null;
   displayAddress: string | null;
@@ -28,14 +41,26 @@ export interface WatchlistSource {
   accountType: 'bank' | 'cash' | null;
   mortgageBalance: number | null;
   tokenPnl: WatchlistTokenPnl[] | null;
+  balances: WatchlistBalance[] | null;
+  valuationStatus: WatchlistValuationStatus;
+}
+
+export interface AddWatchlistCarInput {
+  name: string;
+  currency: string;
+  value: number;
+  note?: string;
 }
 
 export interface WatchlistNetWorth {
   banksUsd: number;
   cashUsd: number;
   propertyUsd: number;
+  carsUsd: number;
   manualTotalUsd: number;
-  cryptoUsd: null;
+  pricedCryptoUsd: number;
+  cryptoUsd: number | null;
+  totalNetWorthUsd: number | null;
   unpricedManualAssetCount: number;
   sourceCounts: {
     wallets: number;
@@ -49,4 +74,5 @@ export interface WatchlistClient {
   listSources(): Promise<WatchlistSource[]>;
   getSource(sourceId: string): Promise<WatchlistSource>;
   getNetWorth(): Promise<WatchlistNetWorth>;
+  addCar(input: AddWatchlistCarInput): Promise<WatchlistSource>;
 }

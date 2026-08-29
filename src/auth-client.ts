@@ -10,9 +10,16 @@ const DEFAULT_AUTH_BASE_URL = 'https://watch.fincobra.com';
 const REQUEST_TIMEOUT_MS = 30_000;
 const LOGIN_SCOPES: McpAccessScope[] = [
   'watchlist:read',
+  'watchlist:write',
   'checkout:read',
   'checkout:write',
 ];
+
+export function hasRequiredLoginScopes(
+  scopes: readonly McpAccessScope[],
+): boolean {
+  return LOGIN_SCOPES.every((scope) => scopes.includes(scope));
+}
 
 export function getAuthBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
   return normalizeBaseUrl(

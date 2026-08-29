@@ -24,3 +24,10 @@ export interface GetInvoiceToolInput {
 export interface GetWatchlistSourceInput {
   sourceId: string;
 }
+
+export interface AddWatchlistCarToolInput {
+  name: string;
+  currency: string;
+  value: number;
+  note?: string;
+}
