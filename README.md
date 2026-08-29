@@ -10,14 +10,6 @@ npx -y fincobra-mcp
 
 Pin a release with `npx -y fincobra-mcp@0.1.0`. Requires Node.js 20+.
 
-From GitHub:
-
-```bash
-npx -y github:dexstandard/fincobra-mcp
-```
-
-Pin a source release with `npx -y github:dexstandard/fincobra-mcp#v0.1.0`.
-
 - Checkout: create a hosted payment invoice and read its status
 - Watchlist: read-only source list and manual net-worth breakdown
 
@@ -91,8 +83,6 @@ Add to `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (user):
   }
 }
 ```
-
-GitHub alternative: `["-y", "github:dexstandard/fincobra-mcp"]`.
 
 ## Claude Code
 
