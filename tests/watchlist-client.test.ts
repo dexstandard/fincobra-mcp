@@ -12,7 +12,7 @@ function jsonResponse(status: number, body: unknown): Response {
 function createFetch(routes: Record<string, unknown>): WatchlistFetch {
   return async (url, init) => {
     expect(init?.headers).toMatchObject({
-      Cookie: 'session=watchlist-session',
+      Authorization: 'Bearer fcm_watchlist',
     });
     const path = new URL(url).pathname;
     const body = routes[path];
@@ -77,7 +77,7 @@ const listedPayloads = {
 describe('createWatchlistClient', () => {
   it('lists wallets, exchanges, and manual assets', async () => {
     const client = createWatchlistClient({
-      sessionToken: 'watchlist-session',
+      accessToken: 'fcm_watchlist',
       fetchImpl: createFetch(listedPayloads),
     });
 
@@ -97,7 +97,7 @@ describe('createWatchlistClient', () => {
 
   it('summarizes manual net worth and leaves crypto USD null', async () => {
     const client = createWatchlistClient({
-      sessionToken: 'watchlist-session',
+      accessToken: 'fcm_watchlist',
       fetchImpl: createFetch(listedPayloads),
     });
 
@@ -114,7 +114,7 @@ describe('createWatchlistClient', () => {
 
   it('gets one source by id', async () => {
     const client = createWatchlistClient({
-      sessionToken: 'watchlist-session',
+      accessToken: 'fcm_watchlist',
       fetchImpl: createFetch(listedPayloads),
     });
 
@@ -123,17 +123,17 @@ describe('createWatchlistClient', () => {
     expect(source.provider).toBe('binance');
   });
 
-  it('explains a rejected session', async () => {
+  it('explains an expired browser login', async () => {
     const fetchImpl = vi.fn<WatchlistFetch>(async () =>
       jsonResponse(403, { error: 'forbidden' }),
     );
     const client = createWatchlistClient({
-      sessionToken: 'bad-session',
+      accessToken: 'fcm_bad',
       fetchImpl,
     });
 
     await expect(client.listSources()).rejects.toThrow(
-      'Set FINCOBRA_WATCHLIST_SESSION_TOKEN',
+      'npx -y fincobra-mcp login',
     );
   });
 });

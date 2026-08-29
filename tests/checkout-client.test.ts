@@ -101,11 +101,10 @@ describe('createCheckoutClient', () => {
     expect(invoice.remainingAmountUsd).toBe(0);
   });
 
-  it('creates an invoice with a Checkout session and trusted origin', async () => {
+  it('creates an invoice with a browser login credential', async () => {
     const fetchImpl = vi.fn<CheckoutFetch>(async (_url, init) => {
       expect(init?.headers).toMatchObject({
-        Cookie: 'session=checkout-session',
-        Origin: 'https://fincobra.com',
+        Authorization: 'Bearer fcm_checkout',
         'Content-Type': 'application/json',
       });
       expect(init?.headers).not.toHaveProperty('X-Api-Key');
@@ -113,7 +112,7 @@ describe('createCheckoutClient', () => {
     });
 
     const client = createCheckoutClient({
-      sessionToken: 'checkout-session',
+      accessToken: 'fcm_checkout',
       fetchImpl,
     });
 
@@ -126,13 +125,13 @@ describe('createCheckoutClient', () => {
       expect(init?.headers).toMatchObject({
         'X-Api-Key': 'fc_live_test',
       });
-      expect(init?.headers).not.toHaveProperty('Cookie');
+      expect(init?.headers).not.toHaveProperty('Authorization');
       return jsonResponse(201, invoicePayload);
     });
 
     const client = createCheckoutClient({
       apiKey: 'fc_live_test',
-      sessionToken: 'checkout-session',
+      accessToken: 'fcm_checkout',
       fetchImpl,
     });
 
@@ -153,17 +152,17 @@ describe('createCheckoutClient', () => {
     });
   });
 
-  it('explains an invalid Checkout session', async () => {
+  it('explains an expired browser login', async () => {
     const client = createCheckoutClient({
-      sessionToken: 'expired-session',
-      fetchImpl: async () => jsonResponse(401, { error: 'Invalid session' }),
+      accessToken: 'fcm_expired',
+      fetchImpl: async () =>
+        jsonResponse(401, { error: 'Invalid FinCobra login' }),
     });
 
     await expect(client.createInvoice({ amountUsd: 1 })).rejects.toMatchObject({
       name: 'CheckoutApiError',
       statusCode: 401,
-      message:
-        'Invalid session. Sign in again and update FINCOBRA_CHECKOUT_SESSION_TOKEN.',
+      message: 'Invalid FinCobra login. Run `npx -y fincobra-mcp login` again.',
     });
   });
 

@@ -6,19 +6,16 @@ describe('CLI setup guidance', () => {
     const help = getCliHelp();
 
     expect(help).toContain('npx installs the server on first use');
-    expect(help).toContain('https://fincobra.com/checkout/settings');
+    expect(help).toContain('npx -y fincobra-mcp login');
     expect(help).toContain('FINCOBRA_CHECKOUT_API_KEY');
-    expect(help).toContain('FINCOBRA_CHECKOUT_SESSION_TOKEN');
-    expect(help).toContain('FINCOBRA_WATCHLIST_SESSION_TOKEN');
-    expect(help).toContain('FINCOBRA_SESSION_TOKEN');
+    expect(help).toContain('You do not copy browser cookies or tokens');
     expect(help).toContain('Restart your MCP client');
   });
 
   it('makes missing authentication distinct from installation failure', () => {
     const message = getMissingAuthMessage();
 
-    expect(message).toContain('is installed');
-    expect(message).toContain('not connected to a FinCobra account');
-    expect(message).toContain('npx -y fincobra-mcp --help');
+    expect(message).toContain('not signed in');
+    expect(message).toContain('npx -y fincobra-mcp login');
   });
 });

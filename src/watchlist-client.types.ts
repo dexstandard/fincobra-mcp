@@ -1,5 +1,5 @@
 export interface WatchlistClientConfig {
-  sessionToken: string;
+  accessToken: string;
   baseUrl?: string;
   fetchImpl?: WatchlistFetch;
 }

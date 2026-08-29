@@ -5,53 +5,49 @@ import {
   readFincobraMcpEnv,
 } from '../src/env.js';
 
+const credential = {
+  version: 1 as const,
+  authBaseUrl: 'https://watch.fincobra.com',
+  accessToken: 'fcm_test',
+  expiresAt: '2026-12-01T00:00:00.000Z',
+  accountLabel: 'user@example.com',
+};
+
 describe('readFincobraMcpEnv', () => {
-  it('accepts checkout only, watchlist only, or both', () => {
+  it('accepts an API key, a browser login, or both', () => {
     expect(
       readFincobraMcpEnv({
         FINCOBRA_CHECKOUT_API_KEY: 'fc_live_checkout',
       }).watchlist,
     ).toBeNull();
 
-    expect(
-      readFincobraMcpEnv({
-        FINCOBRA_WATCHLIST_SESSION_TOKEN: 'session-token',
-      }).checkout,
-    ).toBeNull();
+    expect(readFincobraMcpEnv({}, credential).checkout).toEqual({
+      accessToken: 'fcm_test',
+      baseUrl: 'https://fincobra.com',
+    });
 
-    const both = readFincobraMcpEnv({
-      FINCOBRA_CHECKOUT_API_KEY: 'fc_live_checkout',
-      FINCOBRA_WATCHLIST_SESSION_TOKEN: 'session-token',
-      FINCOBRA_WATCHLIST_BASE_URL: 'https://watch.dev.fincobra.com/',
+    const both = readFincobraMcpEnv(
+      {
+        FINCOBRA_CHECKOUT_API_KEY: 'fc_live_checkout',
+        FINCOBRA_WATCHLIST_BASE_URL: 'https://watch.dev.fincobra.com/',
+      },
+      credential,
+    );
+    expect(both.checkout).toEqual({
+      apiKey: 'fc_live_checkout',
+      baseUrl: 'https://fincobra.com',
     });
     expect(both.watchlist).toEqual({
-      sessionToken: 'session-token',
+      accessToken: 'fcm_test',
       baseUrl: 'https://watch.dev.fincobra.com',
     });
   });
 
-  it('accepts a Checkout session and shares the generic session token', () => {
-    expect(
-      readFincobraMcpEnv({
-        FINCOBRA_CHECKOUT_SESSION_TOKEN: 'checkout-session',
-      }).checkout,
-    ).toEqual({
-      sessionToken: 'checkout-session',
-      baseUrl: 'https://fincobra.com',
+  it('starts without credentials so MCP tools can explain how to sign in', () => {
+    expect(readFincobraMcpEnv({})).toEqual({
+      checkout: null,
+      watchlist: null,
     });
-
-    const shared = readFincobraMcpEnv({
-      FINCOBRA_SESSION_TOKEN: 'shared-session',
-    });
-    expect(shared.checkout?.sessionToken).toBe('shared-session');
-    expect(shared.watchlist?.sessionToken).toBe('shared-session');
-  });
-
-  it('requires at least one surface', () => {
-    expect(() => readFincobraMcpEnv({})).toThrow(CheckoutMcpEnvError);
-    expect(() => readFincobraMcpEnv({})).toThrow(
-      'FinCobra MCP is installed, but it is not connected to a FinCobra account.',
-    );
   });
 });
 
@@ -88,12 +84,12 @@ describe('readCheckoutMcpEnv', () => {
     ).toBe('fc_live_checkout');
   });
 
-  it('prefers an API key over a Checkout session', () => {
+  it('prefers an API key over a browser login', () => {
     expect(
-      readCheckoutMcpEnv({
-        FINCOBRA_CHECKOUT_API_KEY: 'fc_live_checkout',
-        FINCOBRA_CHECKOUT_SESSION_TOKEN: 'checkout-session',
-      }),
+      readCheckoutMcpEnv(
+        { FINCOBRA_CHECKOUT_API_KEY: 'fc_live_checkout' },
+        credential,
+      ),
     ).toEqual({
       apiKey: 'fc_live_checkout',
       baseUrl: 'https://fincobra.com',
@@ -102,8 +98,6 @@ describe('readCheckoutMcpEnv', () => {
 
   it('requires Checkout authentication', () => {
     expect(() => readCheckoutMcpEnv({})).toThrow(CheckoutMcpEnvError);
-    expect(() => readCheckoutMcpEnv({})).toThrow(
-      'FINCOBRA_CHECKOUT_API_KEY or FINCOBRA_CHECKOUT_SESSION_TOKEN is required',
-    );
+    expect(() => readCheckoutMcpEnv({})).toThrow('npx -y fincobra-mcp login');
   });
 });

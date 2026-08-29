@@ -5,6 +5,7 @@ import type {
   FincobraMcpEnv,
   WatchlistMcpEnv,
 } from './env.types.js';
+import type { StoredCredential } from './credentials.types.js';
 
 const DEFAULT_CHECKOUT_BASE_URL = 'https://fincobra.com';
 const DEFAULT_WATCHLIST_BASE_URL = 'https://watch.fincobra.com';
@@ -18,37 +19,32 @@ export class CheckoutMcpEnvError extends Error {
 
 export function readFincobraMcpEnv(
   env: NodeJS.ProcessEnv = process.env,
+  credential: StoredCredential | null = null,
 ): FincobraMcpEnv {
-  const checkout = readCheckoutEnv(env);
-  const watchlist = readWatchlistEnv(env);
-  if (!checkout && !watchlist) {
-    throw new CheckoutMcpEnvError(getMissingAuthMessage());
-  }
-
+  const checkout = readCheckoutEnv(env, credential);
+  const watchlist = readWatchlistEnv(env, credential);
   return { checkout, watchlist };
 }
 
 export function readCheckoutMcpEnv(
   env: NodeJS.ProcessEnv = process.env,
+  credential: StoredCredential | null = null,
 ): CheckoutMcpEnv {
-  const checkout = readCheckoutEnv(env);
+  const checkout = readCheckoutEnv(env, credential);
   if (!checkout) {
-    throw new CheckoutMcpEnvError(
-      'FINCOBRA_CHECKOUT_API_KEY or FINCOBRA_CHECKOUT_SESSION_TOKEN is required. Set one in your MCP server environment.',
-    );
+    throw new CheckoutMcpEnvError(getMissingAuthMessage());
   }
 
   return checkout;
 }
 
-function readCheckoutEnv(env: NodeJS.ProcessEnv): CheckoutMcpEnv | null {
+function readCheckoutEnv(
+  env: NodeJS.ProcessEnv,
+  credential: StoredCredential | null,
+): CheckoutMcpEnv | null {
   const apiKey = firstNonEmpty(
     env.FINCOBRA_CHECKOUT_API_KEY,
     env.FINCOBRA_API_KEY,
-  );
-  const sessionToken = firstNonEmpty(
-    env.FINCOBRA_CHECKOUT_SESSION_TOKEN,
-    env.FINCOBRA_SESSION_TOKEN,
   );
   const configuredBaseUrl = firstNonEmpty(env.FINCOBRA_CHECKOUT_BASE_URL);
   const baseUrl = configuredBaseUrl
@@ -57,25 +53,24 @@ function readCheckoutEnv(env: NodeJS.ProcessEnv): CheckoutMcpEnv | null {
   if (apiKey) {
     return { apiKey, baseUrl };
   }
-  if (sessionToken) {
-    return { sessionToken, baseUrl };
+  if (credential) {
+    return { accessToken: credential.accessToken, baseUrl };
   }
 
   return null;
 }
 
-function readWatchlistEnv(env: NodeJS.ProcessEnv): WatchlistMcpEnv | null {
-  const sessionToken = firstNonEmpty(
-    env.FINCOBRA_WATCHLIST_SESSION_TOKEN,
-    env.FINCOBRA_SESSION_TOKEN,
-  );
-  if (!sessionToken) {
+function readWatchlistEnv(
+  env: NodeJS.ProcessEnv,
+  credential: StoredCredential | null,
+): WatchlistMcpEnv | null {
+  if (!credential) {
     return null;
   }
 
   const configuredBaseUrl = firstNonEmpty(env.FINCOBRA_WATCHLIST_BASE_URL);
   return {
-    sessionToken,
+    accessToken: credential.accessToken,
     baseUrl: configuredBaseUrl
       ? normalizeBaseUrl(configuredBaseUrl)
       : DEFAULT_WATCHLIST_BASE_URL,

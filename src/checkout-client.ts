@@ -12,7 +12,7 @@ const USER_AGENT = `fincobra-mcp/${FINCOBRA_MCP_VERSION}`;
 
 type CheckoutAuth =
   | { type: 'api_key'; value: string }
-  | { type: 'session'; value: string };
+  | { type: 'browser_login'; value: string };
 
 export class CheckoutApiError extends Error {
   statusCode: number;
@@ -30,7 +30,7 @@ export function createCheckoutClient(
   const auth = resolveCheckoutAuth(config);
   if (!auth) {
     throw new Error(
-      'Checkout authentication is missing. Set FINCOBRA_CHECKOUT_API_KEY or FINCOBRA_CHECKOUT_SESSION_TOKEN.',
+      'Checkout authentication is missing. Run `npx -y fincobra-mcp login` or set FINCOBRA_CHECKOUT_API_KEY.',
     );
   }
 
@@ -92,7 +92,7 @@ async function requestInvoice(
       method: options.method,
       headers: {
         Accept: 'application/json',
-        ...checkoutAuthHeaders(options.auth, options.baseUrl),
+        ...checkoutAuthHeaders(options.auth),
         'User-Agent': USER_AGENT,
         ...(options.body === undefined
           ? {}
@@ -128,22 +128,16 @@ function resolveCheckoutAuth(
     return { type: 'api_key', value: apiKey };
   }
 
-  const sessionToken = normalizeCredential(config.sessionToken);
-  return sessionToken ? { type: 'session', value: sessionToken } : null;
+  const accessToken = normalizeCredential(config.accessToken);
+  return accessToken ? { type: 'browser_login', value: accessToken } : null;
 }
 
-function checkoutAuthHeaders(
-  auth: CheckoutAuth,
-  baseUrl: string,
-): Record<string, string> {
+function checkoutAuthHeaders(auth: CheckoutAuth): Record<string, string> {
   if (auth.type === 'api_key') {
     return { 'X-Api-Key': auth.value };
   }
 
-  return {
-    Cookie: `session=${auth.value}`,
-    Origin: new URL(baseUrl).origin,
-  };
+  return { Authorization: `Bearer ${auth.value}` };
 }
 
 function normalizeCredential(value: string | undefined): string | null {
@@ -165,7 +159,7 @@ function formatCheckoutHttpError(
   if (statusCode === 401) {
     return authType === 'api_key'
       ? `${apiMessage ?? 'Invalid API key'}. Set FINCOBRA_CHECKOUT_API_KEY to a valid Checkout API key.`
-      : `${apiMessage ?? 'Invalid session'}. Sign in again and update FINCOBRA_CHECKOUT_SESSION_TOKEN.`;
+      : `${apiMessage ?? 'FinCobra login expired'}. Run \`npx -y fincobra-mcp login\` again.`;
   }
 
   if (apiMessage) {
