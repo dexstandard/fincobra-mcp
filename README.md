@@ -1,6 +1,6 @@
 # FinCobra MCP — crypto checkout for Claude, Cursor, and Codex
 
-[Model Context Protocol](https://modelcontextprotocol.io) server for FinCobra Checkout and read-only Watchlist data. It creates hosted BTC, USDT, and USDC invoices and reads the sources in your FinCobra Watchlist.
+[Model Context Protocol](https://modelcontextprotocol.io) server for FinCobra Checkout and Watchlist. This guide covers release **0.3.0**. It creates hosted BTC, USDT, and USDC invoices, reads live Watchlist balances, and can add a car as a manual asset.
 
 Docs: [FinCobra Checkout MCP](https://fincobra.com/docs/checkout/mcp.html)
 
@@ -11,7 +11,7 @@ You need Node.js 20 or later and a FinCobra account. `npx` installs the package 
 1. Install the package and sign in:
 
 ```bash
-npx -y fincobra-mcp login
+npx -y fincobra-mcp@0.3.0 login
 ```
 
 The command opens FinCobra in your browser.
@@ -26,7 +26,7 @@ You do not copy browser cookies, session tokens, or access tokens.
 2. Add the MCP command to your client:
 
 ```bash
-npx -y fincobra-mcp
+npx -y fincobra-mcp@0.3.0
 ```
 
 3. Restart the MCP client.
@@ -34,21 +34,22 @@ npx -y fincobra-mcp
 Check or remove the saved login at any time:
 
 ```bash
-npx -y fincobra-mcp status
-npx -y fincobra-mcp logout
+npx -y fincobra-mcp@0.3.0 status
+npx -y fincobra-mcp@0.3.0 logout
 ```
 
-Pin this release with `npx -y fincobra-mcp@0.2.0`.
+Pin this release with `npx -y fincobra-mcp@0.3.0`.
 
 ## Access model
 
 Browser login gives the CLI a dedicated credential with only these approved scopes:
 
-| Scope            | Access                                                                |
-| ---------------- | --------------------------------------------------------------------- |
-| `watchlist:read` | Read Watchlist wallets, exchanges, manual assets, and exchange rates. |
-| `checkout:read`  | Read a Checkout invoice by its invoice ID.                            |
-| `checkout:write` | Create a Checkout invoice.                                            |
+| Scope             | Access                                                                |
+| ----------------- | --------------------------------------------------------------------- |
+| `watchlist:read`  | Read Watchlist wallets, exchanges, manual assets, and exchange rates. |
+| `watchlist:write` | Add a car as a manual Watchlist asset.                                |
+| `checkout:read`   | Read a Checkout invoice by its invoice ID.                            |
+| `checkout:write`  | Create a Checkout invoice.                                            |
 
 The CLI never reads or stores the Identity browser session cookie. The saved CLI credential expires, can be revoked with `logout`, and cannot access general account settings.
 
@@ -73,15 +74,16 @@ Invoice settlement assets come from the merchant's Checkout payment methods:
 | Arbitrum One     | USDC       |
 | Base             | USDC       |
 
-### Watchlist (read-only)
+### Watchlist
 
-| Tool            | What it does                                          |
-| --------------- | ----------------------------------------------------- |
-| `get_net_worth` | Return manual bank, cash, and property totals in USD. |
-| `list_sources`  | List wallets, exchanges, and manual assets.           |
-| `get_source`    | Read one source by the ID from `list_sources`.        |
+| Tool            | What it does                                               |
+| --------------- | ---------------------------------------------------------- |
+| `get_net_worth` | Return live crypto and manual asset totals in USD.         |
+| `list_sources`  | List wallets, exchanges, live balances, and manual assets. |
+| `get_source`    | Read one source by the ID from `list_sources`.             |
+| `add_car`       | Add a car with a name, currency, value, and optional note. |
 
-Banks, cash, and property are manual entries. Live crypto USD balances are computed in the Watchlist UI and are not returned by the current list API, so `cryptoUsd` is `null`.
+Banks, cash, property, and cars are manual entries. `cryptoUsd` and `totalNetWorthUsd` are `null` when any live crypto source is temporarily unavailable. In that case, `pricedCryptoUsd` contains the sources that were valued successfully.
 
 ## Client examples
 
@@ -94,7 +96,7 @@ Add this to `.cursor/mcp.json` or `~/.cursor/mcp.json` after you run the login c
   "mcpServers": {
     "fincobra": {
       "command": "npx",
-      "args": ["-y", "fincobra-mcp"]
+      "args": ["-y", "fincobra-mcp@0.3.0"]
     }
   }
 }
@@ -103,13 +105,13 @@ Add this to `.cursor/mcp.json` or `~/.cursor/mcp.json` after you run the login c
 ### Claude Code
 
 ```bash
-claude mcp add fincobra -- npx -y fincobra-mcp
+claude mcp add fincobra -- npx -y fincobra-mcp@0.3.0
 ```
 
 ### Codex
 
 ```bash
-codex mcp add fincobra -- npx -y fincobra-mcp
+codex mcp add fincobra -- npx -y fincobra-mcp@0.3.0
 ```
 
 Or add this to `~/.codex/config.toml`:
@@ -117,7 +119,7 @@ Or add this to `~/.codex/config.toml`:
 ```toml
 [mcp_servers.fincobra]
 command = "npx"
-args = ["-y", "fincobra-mcp"]
+args = ["-y", "fincobra-mcp@0.3.0"]
 ```
 
 ## Environment variables
