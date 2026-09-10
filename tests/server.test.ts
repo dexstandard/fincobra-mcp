@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CheckoutClient } from '../src/checkout-client.types.js';
 import type { WatchlistClient } from '../src/watchlist-client.types.js';
-import {
-  createCheckoutMcpServer,
-  createFincobraMcpServer,
-} from '../src/server.js';
+import { createFincobraMcpServer } from '../src/server.js';
 
 const unusedCheckout: CheckoutClient = {
   async createInvoice() {
@@ -31,13 +28,14 @@ const unusedWatchlist: WatchlistClient = {
 };
 
 describe('createFincobraMcpServer', () => {
-  it('constructs a server with the v0 Checkout and Watchlist tools', () => {
+  it('constructs a server with the Checkout and Watchlist tools', () => {
     const server = createFincobraMcpServer({
       checkoutClient: unusedCheckout,
       watchlistClient: unusedWatchlist,
     });
     expect(server).toBeDefined();
     expect(registeredToolNames(server)).toEqual([
+      'get_connection_status',
       'create_invoice',
       'get_invoice',
       'get_net_worth',
@@ -45,11 +43,6 @@ describe('createFincobraMcpServer', () => {
       'get_source',
       'add_car',
     ]);
-  });
-
-  it('keeps the Checkout constructor alias', () => {
-    const server = createCheckoutMcpServer({ client: unusedCheckout });
-    expect(registeredToolNames(server)).toContain('create_invoice');
   });
 });
 

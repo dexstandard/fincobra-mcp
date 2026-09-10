@@ -6,6 +6,7 @@ import type {
   WatchlistClientConfig,
   WatchlistFetch,
   WatchlistBalance,
+  WatchlistBalanceLocation,
   WatchlistNetWorth,
   WatchlistSource,
   WatchlistTokenPnl,
@@ -27,7 +28,7 @@ export function createWatchlistClient(
   const accessToken = normalizeAccessToken(config.accessToken);
   if (accessToken.length === 0) {
     throw new Error(
-      'FinCobra login is missing. Run `npx -y fincobra-mcp login`.',
+      'FinCobra login is missing. Connect FinCobra in your MCP client and approve access in the browser.',
     );
   }
 
@@ -137,6 +138,14 @@ async function listWatchlistSources(
     balances:
       source.balances?.map((balance) => ({
         ...balance,
+        sourceBalances:
+          balance.sourceBalances?.map((location) => ({
+            ...location,
+            valueInReportingCurrency:
+              location.valueUsd === null
+                ? null
+                : location.valueUsd * reportingRate,
+          })) ?? null,
         valueInReportingCurrency:
           balance.valueUsd === null ? null : balance.valueUsd * reportingRate,
       })) ?? null,
@@ -343,32 +352,37 @@ function withExchangeBalances(
       typeof asset === 'string' ? [asset.toUpperCase()] : [],
     ),
   );
-  const balances = readArray(record.balances).flatMap((raw) => {
-    const balance = asRecord(raw);
-    const asset = balance ? readString(balance.asset) : null;
-    if (!balance || !asset) {
-      return [];
-    }
-    const amount =
-      readArray(balance.sourceBalances).reduce<number>((total, entry) => {
-        const sourceBalance = asRecord(entry);
-        return total + (readNumeric(sourceBalance?.amount) ?? 0);
-      }, 0) + (readNumeric(balance.lockedBalance) ?? 0);
-    const excluded = excludedAssets.has(asset.toUpperCase());
-    const price = excluded ? undefined : prices[asset.toUpperCase()];
-    return [
-      {
-        asset,
-        includedInTotal: !excluded,
-        exclusionReason: excluded ? 'unsupported_token' : null,
-        balance: amount,
-        valueUsd:
-          typeof price === 'number' && Number.isFinite(price)
-            ? amount * price
-            : null,
-      } satisfies WatchlistBalance,
-    ];
-  });
+  const balances: WatchlistBalance[] = readArray(record.balances).flatMap(
+    (raw) => {
+      const balance = asRecord(raw);
+      const asset = balance ? readString(balance.asset) : null;
+      if (!balance || !asset) {
+        return [];
+      }
+      const excluded = excludedAssets.has(asset.toUpperCase());
+      const price = excluded ? undefined : prices[asset.toUpperCase()];
+      const sourceBalances =
+        readBalanceLocations(balance.sourceBalances, price ?? null) ?? [];
+      const lockedBalance = readNumeric(balance.lockedBalance) ?? 0;
+      const amount =
+        sourceBalances.reduce((total, entry) => total + entry.amount, 0) +
+        lockedBalance;
+      return [
+        {
+          asset,
+          includedInTotal: !excluded,
+          exclusionReason: excluded ? 'unsupported_token' : null,
+          balance: amount,
+          sourceBalances,
+          lockedBalance,
+          valueUsd:
+            typeof price === 'number' && Number.isFinite(price)
+              ? amount * price
+              : null,
+        } satisfies WatchlistBalance,
+      ];
+    },
+  );
   const pricedBalances = balances.filter(
     (balance): balance is WatchlistBalance & { valueUsd: number } =>
       balance.valueUsd !== null,
@@ -441,7 +455,7 @@ function formatWatchlistHttpError(
   const apiMessage = readApiErrorMessage(payload);
 
   if (statusCode === 403 || statusCode === 401) {
-    return `${apiMessage ?? 'FinCobra login expired'}. Run \`npx -y fincobra-mcp login\` again.`;
+    return `${apiMessage ?? 'FinCobra login expired'}. Reconnect FinCobra in your MCP client to renew browser authorization.`;
   }
 
   return apiMessage ?? `Watchlist request failed with HTTP ${statusCode}`;
@@ -545,6 +559,29 @@ function toManualSource(
   };
 }
 
+function readBalanceLocations(
+  value: unknown,
+  price: number | null,
+): WatchlistBalanceLocation[] | null {
+  if (value === undefined) return null;
+  if (!Array.isArray(value))
+    throw new Error('Balance locations are unavailable.');
+  return value.map((raw) => {
+    const entry = asRecord(raw);
+    const source = readString(entry?.source);
+    const label = readString(entry?.label);
+    const amount = readNumeric(entry?.amount);
+    if (!source || !label || amount === null)
+      throw new Error('A balance location is incomplete.');
+    return {
+      source,
+      label,
+      amount,
+      valueUsd: price === null ? null : price * amount,
+    };
+  });
+}
+
 function readBalances(value: unknown): WatchlistBalance[] {
   return readArray(value).flatMap((raw) => {
     const record = asRecord(raw);
@@ -561,6 +598,11 @@ function readBalances(value: unknown): WatchlistBalance[] {
         valueUsd,
         includedInTotal: true,
         exclusionReason: null,
+        sourceBalances: readBalanceLocations(
+          record?.sourceBalances,
+          valueUsd !== null && balance > 0 ? valueUsd / balance : null,
+        ),
+        lockedBalance: 0,
       },
     ];
   });

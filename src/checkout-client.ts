@@ -30,7 +30,7 @@ export function createCheckoutClient(
   const auth = resolveCheckoutAuth(config);
   if (!auth) {
     throw new Error(
-      'Checkout authentication is missing. Run `npx -y fincobra-mcp login` or set FINCOBRA_CHECKOUT_API_KEY.',
+      'Checkout authentication is missing. Connect FinCobra in your MCP client and approve Checkout access in the browser.',
     );
   }
 
@@ -159,7 +159,7 @@ function formatCheckoutHttpError(
   if (statusCode === 401) {
     return authType === 'api_key'
       ? `${apiMessage ?? 'Invalid API key'}. Set FINCOBRA_CHECKOUT_API_KEY to a valid Checkout API key.`
-      : `${apiMessage ?? 'FinCobra login expired'}. Run \`npx -y fincobra-mcp login\` again.`;
+      : `${apiMessage ?? 'FinCobra login expired'}. Reconnect FinCobra in your MCP client to renew browser authorization.`;
   }
 
   if (apiMessage) {

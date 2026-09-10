@@ -5,8 +5,13 @@ import type {
   WatchlistClient,
 } from './watchlist-client.types.js';
 
-export interface CheckoutMcpServerOptions {
-  client?: CheckoutClient;
+export interface FincobraMcpServerOptions {
+  connection?: {
+    clientId: string;
+    scopes: string[];
+    expiresAt: string;
+    accountId: string;
+  };
   checkoutClient?: CheckoutClient;
   watchlistClient?: WatchlistClient;
 }

@@ -9,7 +9,7 @@ import {
   handleGetSource,
   handleListSources,
 } from './tools.js';
-import type { CheckoutMcpServerOptions } from './server.types.js';
+import type { FincobraMcpServerOptions } from './server.types.js';
 import { FINCOBRA_MCP_VERSION } from './version.js';
 
 const invoiceSummarySchema = z.object({
@@ -132,6 +132,17 @@ const watchlistSourceSchema = z.object({
   balances: z
     .array(
       z.object({
+        sourceBalances: z
+          .array(
+            z.object({
+              source: z.string(),
+              label: z.string(),
+              amount: z.number(),
+              valueUsd: z.number().nullable(),
+            }),
+          )
+          .nullable(),
+        lockedBalance: z.number(),
         asset: z.string(),
         includedInTotal: z.boolean(),
         exclusionReason: z.literal('unsupported_token').nullable(),
@@ -149,6 +160,18 @@ const reportedSourceSchema = watchlistSourceSchema.extend({
   balances: z
     .array(
       z.object({
+        sourceBalances: z
+          .array(
+            z.object({
+              source: z.string(),
+              label: z.string(),
+              amount: z.number(),
+              valueUsd: z.number().nullable(),
+              valueInReportingCurrency: z.number().nullable(),
+            }),
+          )
+          .nullable(),
+        lockedBalance: z.number(),
         asset: z.string(),
         includedInTotal: z.boolean(),
         exclusionReason: z.literal('unsupported_token').nullable(),
@@ -182,121 +205,190 @@ const netWorthSchema = z.object({
 });
 
 export function createFincobraMcpServer(
-  options: CheckoutMcpServerOptions = {},
+  options: FincobraMcpServerOptions = {},
 ): McpServer {
-  const checkoutClient = options.checkoutClient ?? options.client;
-  const server = new McpServer({
-    name: 'fincobra',
-    version: FINCOBRA_MCP_VERSION,
-  });
-
-  server.registerTool(
-    'create_invoice',
+  const checkoutClient = options.checkoutClient;
+  const server = new McpServer(
     {
-      title: 'Create Checkout invoice',
-      description:
-        'Create a FinCobra Checkout invoice in USD and return the hosted payment URL. Payment methods (Bitcoin, Ethereum USDT/USDC, Solana USDT/USDC, Arbitrum One USDC, Base USDC) are those enabled in the merchant dashboard.',
-      inputSchema: createInvoiceInputSchema,
-      outputSchema: invoiceSummarySchema,
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: false,
-      },
+      name: 'fincobra',
+      version: FINCOBRA_MCP_VERSION,
     },
-    async (input) => handleCreateInvoice(checkoutClient, input),
+    {
+      instructions:
+        'FinCobra provides authenticated Checkout and Watchlist tools. Use get_connection_status to verify the connection. Use get_net_worth for the full portfolio; currency defaults to USD. Each asset retains its original amount and USD value. Exchange sourceBalances distinguish Spot, Funding, and Earn; lockedBalance is separate. Unsupported tokens excluded from totals do not make totals incomplete. Report valuationStatus and notes when supported values are unavailable. Only approved tools are listed.',
+    },
   );
 
   server.registerTool(
-    'get_invoice',
+    'get_connection_status',
     {
-      title: 'Get Checkout invoice',
+      title: 'Check FinCobra connection',
       description:
-        'Look up a known FinCobra Checkout invoice by id. Returns status, hosted payment URL, and amounts.',
-      inputSchema: getInvoiceInputSchema,
-      outputSchema: invoiceSummarySchema,
+        'Check the authenticated account, granted permissions, access expiry, and MCP server version. Use this first when asked whether FinCobra is connected.',
+      inputSchema: z.object({}),
+      outputSchema: z.object({
+        connected: z.boolean(),
+        version: z.string(),
+        accountId: z.string().nullable(),
+        clientId: z.string().nullable(),
+        scopes: z.array(z.string()),
+        expiresAt: z.string().nullable(),
+        defaultCurrency: z.literal('USD'),
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
       },
     },
-    async (input) => handleGetInvoice(checkoutClient, input),
+    async () => {
+      const data = {
+        connected: Boolean(options.connection),
+        version: FINCOBRA_MCP_VERSION,
+        accountId: options.connection?.accountId ?? null,
+        clientId: options.connection?.clientId ?? null,
+        scopes: options.connection?.scopes ?? [],
+        expiresAt: options.connection?.expiresAt ?? null,
+        defaultCurrency: 'USD' as const,
+      };
+      return {
+        content: [{ type: 'text', text: JSON.stringify(data) }],
+        structuredContent: data,
+      };
+    },
   );
 
-  server.registerTool(
-    'get_net_worth',
-    {
-      title: 'Get Watchlist net worth',
-      description:
-        'Read all Watchlist sources and net worth with original amounts, USD values, and optional reporting-currency values. Unsupported tokens marked excluded do not block totals. Banks, cash, property, and cars are manual entries. When a live source cannot be valued, cryptoUsd and totalNetWorthUsd are null and pricedCryptoUsd contains the available subtotal.',
-      inputSchema: reportingInputSchema,
-      outputSchema: netWorthSchema,
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
+  if (
+    !options.connection ||
+    options.connection.scopes.includes('checkout:write')
+  ) {
+    server.registerTool(
+      'create_invoice',
+      {
+        title: 'Create Checkout invoice',
+        description:
+          'Create a FinCobra Checkout invoice in USD and return the hosted payment URL. Payment methods (Bitcoin, Ethereum USDT/USDC, Solana USDT/USDC, Arbitrum One USDC, Base USDC) are those enabled in the merchant dashboard.',
+        inputSchema: createInvoiceInputSchema,
+        outputSchema: invoiceSummarySchema,
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+        },
       },
-    },
-    async (input) => handleGetNetWorth(options.watchlistClient, input),
-  );
+      async (input) => handleCreateInvoice(checkoutClient, input),
+    );
+  }
 
-  server.registerTool(
-    'list_sources',
-    {
-      title: 'List Watchlist sources',
-      description:
-        'List Watchlist wallets, exchanges, and manual bank, cash, property, or car sources. Includes live crypto balances and stored token PnL cost-basis rows when available.',
-      inputSchema: reportingInputSchema,
-      outputSchema: z.object({ sources: z.array(reportedSourceSchema) }),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
+  if (
+    !options.connection ||
+    options.connection.scopes.includes('checkout:read')
+  ) {
+    server.registerTool(
+      'get_invoice',
+      {
+        title: 'Get Checkout invoice',
+        description:
+          'Look up a known FinCobra Checkout invoice by id. Returns status, hosted payment URL, and amounts.',
+        inputSchema: getInvoiceInputSchema,
+        outputSchema: invoiceSummarySchema,
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+        },
       },
-    },
-    async (input) => handleListSources(options.watchlistClient, input),
-  );
+      async (input) => handleGetInvoice(checkoutClient, input),
+    );
+  }
 
-  server.registerTool(
-    'get_source',
-    {
-      title: 'Get Watchlist source',
-      description:
-        'Look up one Watchlist source by the id returned from list_sources.',
-      inputSchema: getSourceInputSchema,
-      outputSchema: reportedSourceSchema,
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
+  if (
+    !options.connection ||
+    options.connection.scopes.includes('watchlist:read')
+  ) {
+    server.registerTool(
+      'get_net_worth',
+      {
+        title: 'Get Watchlist net worth',
+        description:
+          'Read all Watchlist sources and net worth with original amounts, USD values, and optional reporting-currency values. Unsupported tokens marked excluded do not block totals. Banks, cash, property, and cars are manual entries. When a live source cannot be valued, cryptoUsd and totalNetWorthUsd are null and pricedCryptoUsd contains the available subtotal.',
+        inputSchema: reportingInputSchema,
+        outputSchema: netWorthSchema,
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+        },
       },
-    },
-    async (input) => handleGetSource(options.watchlistClient, input),
-  );
+      async (input) => handleGetNetWorth(options.watchlistClient, input),
+    );
+  }
 
-  server.registerTool(
-    'add_car',
-    {
-      title: 'Add Watchlist car',
-      description:
-        'Add a car to Watchlist as a manual asset using its current estimated value.',
-      inputSchema: addCarInputSchema,
-      outputSchema: watchlistSourceSchema,
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: false,
+  if (
+    !options.connection ||
+    options.connection.scopes.includes('watchlist:read')
+  ) {
+    server.registerTool(
+      'list_sources',
+      {
+        title: 'List Watchlist sources',
+        description:
+          'List Watchlist wallets, exchanges, and manual bank, cash, property, or car sources. Includes live crypto balances and stored token PnL cost-basis rows when available.',
+        inputSchema: reportingInputSchema,
+        outputSchema: z.object({ sources: z.array(reportedSourceSchema) }),
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+        },
       },
-    },
-    async (input) => handleAddCar(options.watchlistClient, input),
-  );
+      async (input) => handleListSources(options.watchlistClient, input),
+    );
+  }
+
+  if (
+    !options.connection ||
+    options.connection.scopes.includes('watchlist:read')
+  ) {
+    server.registerTool(
+      'get_source',
+      {
+        title: 'Get Watchlist source',
+        description:
+          'Look up one Watchlist source by the id returned from list_sources.',
+        inputSchema: getSourceInputSchema,
+        outputSchema: reportedSourceSchema,
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+        },
+      },
+      async (input) => handleGetSource(options.watchlistClient, input),
+    );
+  }
+
+  if (
+    !options.connection ||
+    options.connection.scopes.includes('watchlist:write')
+  ) {
+    server.registerTool(
+      'add_car',
+      {
+        title: 'Add Watchlist car',
+        description:
+          'Add a car to Watchlist as a manual asset using its current estimated value.',
+        inputSchema: addCarInputSchema,
+        outputSchema: watchlistSourceSchema,
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+        },
+      },
+      async (input) => handleAddCar(options.watchlistClient, input),
+    );
+  }
 
   return server;
-}
-
-export function createCheckoutMcpServer(
-  options: CheckoutMcpServerOptions,
-): McpServer {
-  return createFincobraMcpServer(options);
 }

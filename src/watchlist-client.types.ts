@@ -15,7 +15,16 @@ export interface WatchlistTokenPnl {
   reliable: boolean;
 }
 
+export interface WatchlistBalanceLocation {
+  source: string;
+  label: string;
+  amount: number;
+  valueUsd: number | null;
+}
+
 export interface WatchlistBalance {
+  sourceBalances: WatchlistBalanceLocation[] | null;
+  lockedBalance: number;
   includedInTotal: boolean;
   exclusionReason: 'unsupported_token' | null;
   asset: string;
@@ -105,6 +114,9 @@ export const REPORTING_CURRENCIES = [
 export type ReportingCurrency = (typeof REPORTING_CURRENCIES)[number];
 
 export interface WatchlistReportedBalance extends WatchlistBalance {
+  sourceBalances:
+    | (WatchlistBalanceLocation & { valueInReportingCurrency: number | null })[]
+    | null;
   valueInReportingCurrency: number | null;
 }
 

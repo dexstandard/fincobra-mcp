@@ -162,7 +162,8 @@ describe('createCheckoutClient', () => {
     await expect(client.createInvoice({ amountUsd: 1 })).rejects.toMatchObject({
       name: 'CheckoutApiError',
       statusCode: 401,
-      message: 'Invalid FinCobra login. Run `npx -y fincobra-mcp login` again.',
+      message:
+        'Invalid FinCobra login. Reconnect FinCobra in your MCP client to renew browser authorization.',
     });
   });
 

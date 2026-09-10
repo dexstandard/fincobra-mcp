@@ -18,9 +18,9 @@ import type {
 } from './watchlist-client.types.js';
 
 const CHECKOUT_NOT_CONFIGURED =
-  'FinCobra MCP is not signed in. Run `npx -y fincobra-mcp login`. Checkout can also use FINCOBRA_CHECKOUT_API_KEY.';
+  'FinCobra MCP is not signed in. Connect FinCobra in your MCP client and approve Checkout access in the browser.';
 const WATCHLIST_NOT_CONFIGURED =
-  'FinCobra MCP is not signed in. Run `npx -y fincobra-mcp login`.';
+  'FinCobra MCP is not signed in. Connect FinCobra in your MCP client and approve access in the browser.';
 
 export async function handleCreateInvoice(
   client: CheckoutClient | undefined,

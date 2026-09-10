@@ -120,6 +120,67 @@ describe('createWatchlistClient', () => {
     expect(sources[4]?.valueUsd).toBe(600000);
   });
 
+  it('keeps idle, Earn, locked, and staked balances separate with reporting values', async () => {
+    const client = createWatchlistClient({
+      accessToken: 'fcm_watchlist',
+      fetchImpl: createFetch({
+        ...listedPayloads,
+        '/api/users/user-id/binance/account': {
+          balances: [
+            {
+              asset: 'USDT',
+              sourceBalances: [
+                { source: 'spot', label: 'Spot', amount: '4250' },
+                { source: 'earn', label: 'Earn', amount: '500' },
+              ],
+              lockedBalance: '10',
+            },
+          ],
+          tokenPrices: { USDT: 1 },
+        },
+        '/api/watchlist/wallets/12/balances': {
+          balances: [
+            {
+              asset: 'SOL',
+              balance: 5,
+              valueUsd: 500,
+              sourceBalances: [
+                { source: 'available', label: 'Available', amount: 1 },
+                { source: 'staked', label: 'Staked', amount: 4 },
+              ],
+            },
+          ],
+          totalUsd: 500,
+        },
+      }),
+    });
+    const result = await client.listSources('EUR');
+    expect(result[1].balances?.[0]).toMatchObject({
+      balance: 4760,
+      lockedBalance: 10,
+      valueUsd: 4760,
+      valueInReportingCurrency: 2380,
+      sourceBalances: [
+        {
+          source: 'spot',
+          amount: 4250,
+          valueUsd: 4250,
+          valueInReportingCurrency: 2125,
+        },
+        {
+          source: 'earn',
+          amount: 500,
+          valueUsd: 500,
+          valueInReportingCurrency: 250,
+        },
+      ],
+    });
+    expect(result[0].balances?.[0].sourceBalances).toMatchObject([
+      { source: 'available', amount: 1, valueUsd: 100 },
+      { source: 'staked', amount: 4, valueUsd: 400 },
+    ]);
+  });
+
   it('summarizes live crypto and manual net worth', async () => {
     const client = createWatchlistClient({
       accessToken: 'fcm_watchlist',
@@ -182,12 +243,14 @@ describe('createWatchlistClient', () => {
           balances: [
             {
               asset: 'HYPE',
-              sourceBalances: [{ amount: '2' }],
+              sourceBalances: [{ source: 'spot', label: 'Spot', amount: '2' }],
               lockedBalance: '1',
             },
             {
               asset: 'MAX',
-              sourceBalances: [{ amount: '172724.7177' }],
+              sourceBalances: [
+                { source: 'spot', label: 'Spot', amount: '172724.7177' },
+              ],
               lockedBalance: '0',
             },
           ],
@@ -371,7 +434,7 @@ describe('createWatchlistClient', () => {
     });
 
     await expect(client.listSources()).rejects.toThrow(
-      'npx -y fincobra-mcp login',
+      'Reconnect FinCobra in your MCP client',
     );
   });
 });

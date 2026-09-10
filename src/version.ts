@@ -1,1 +1,1 @@
-export const FINCOBRA_MCP_VERSION = '0.3.1';
+export const FINCOBRA_MCP_VERSION = '0.4.0';

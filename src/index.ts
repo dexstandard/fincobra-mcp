@@ -3,7 +3,6 @@ export {
   createCheckoutClient,
   normalizeBaseUrl,
 } from './checkout-client.js';
-export { hasRequiredLoginScopes } from './auth-client.js';
 export type {
   CheckoutClient,
   CheckoutClientConfig,
@@ -11,20 +10,13 @@ export type {
   CheckoutInvoiceSummary,
   CreateCheckoutInvoiceInput,
 } from './checkout-client.types.js';
-export {
-  CheckoutMcpEnvError,
-  readCheckoutMcpEnv,
-  readFincobraMcpEnv,
-} from './env.js';
-export type {
-  CheckoutMcpEnv,
-  FincobraMcpEnv,
-  WatchlistMcpEnv,
-} from './env.types.js';
-export { createCheckoutMcpServer, createFincobraMcpServer } from './server.js';
+export { createFincobraMcpServer } from './server.js';
+export { createFincobraMcpHandler } from './http.js';
+export type { FincobraMcpHttpOptions } from './http.types.js';
+export { FINCOBRA_MCP_VERSION } from './version.js';
 export type {
   AddWatchlistCarToolInput,
-  CheckoutMcpServerOptions,
+  FincobraMcpServerOptions,
   CheckoutMcpToolResult,
   CreateInvoiceToolInput,
   GetInvoiceToolInput,

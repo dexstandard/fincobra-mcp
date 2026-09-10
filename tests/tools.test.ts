@@ -81,9 +81,11 @@ describe('checkout MCP tools', () => {
     expect(result.content[0]?.text).toContain('Invalid API key');
   });
 
-  it('explains missing Checkout API key config', async () => {
+  it('explains missing Checkout authorization', async () => {
     const result = await handleCreateInvoice(undefined, { amountUsd: 1 });
     expect(result.isError).toBe(true);
-    expect(result.content[0]?.text).toContain('FINCOBRA_CHECKOUT_API_KEY');
+    expect(result.content[0]?.text).toContain(
+      'approve Checkout access in the browser',
+    );
   });
 });
