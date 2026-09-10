@@ -14,8 +14,10 @@ For Codex:
 
 ```sh
 codex mcp add fincobra --url https://watch.fincobra.com/api/mcp
-codex mcp login fincobra
+codex mcp login fincobra --scopes watchlist:read,checkout:read
 ```
+
+Codex can start browser authorization during `mcp add` and request all supported permissions. For a read-only connection, close that initial prompt and use the explicit `mcp login --scopes` command above.
 
 For Claude Code:
 
@@ -35,7 +37,7 @@ A saved server entry alone does not prove that the client loaded its tools. If t
 
 ## Tools and permissions
 
-The default connection requests `watchlist:read` and `checkout:read`. Only tools covered by the approved scopes are listed. To enable writes, request the additional scope in your MCP client's OAuth settings and approve it in the browser. In Codex, use:
+When a client omits scopes, FinCobra uses `watchlist:read` and `checkout:read`. Some clients request all advertised scopes. Check the permissions on the consent page. Only tools covered by the approved scopes are listed. To enable writes, request the additional scope in your MCP client's OAuth settings and approve it in the browser. In Codex, use:
 
 ```sh
 codex mcp login fincobra --scopes watchlist:read,checkout:read,watchlist:write,checkout:write
