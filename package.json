@@ -1,7 +1,7 @@
 {
   "name": "fincobra-mcp",
-  "version": "0.2.0",
-  "description": "Thin MCP server for FinCobra Checkout invoices and read-only Watchlist data.",
+  "version": "0.3.1",
+  "description": "Thin MCP server for FinCobra Checkout invoices and live Watchlist portfolios.",
   "license": "MIT",
   "type": "module",
   "bin": {

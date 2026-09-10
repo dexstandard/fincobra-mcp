@@ -1,6 +1,6 @@
 # FinCobra MCP — crypto checkout for Claude, Cursor, and Codex
 
-[Model Context Protocol](https://modelcontextprotocol.io) server for FinCobra Checkout and Watchlist. This guide covers release **0.3.0**. It creates hosted BTC, USDT, and USDC invoices, reads live Watchlist balances, and can add a car as a manual asset.
+[Model Context Protocol](https://modelcontextprotocol.io) server for FinCobra Checkout and Watchlist. This guide covers release **0.3.1**. It creates hosted BTC, USDT, and USDC invoices, reads live Watchlist balances, and can add a car as a manual asset.
 
 Docs: [FinCobra Checkout MCP](https://fincobra.com/docs/checkout/mcp.html)
 
@@ -11,7 +11,7 @@ You need Node.js 20 or later and a FinCobra account. `npx` installs the package 
 1. Install the package and sign in:
 
 ```bash
-npx -y fincobra-mcp@0.3.0 login
+npx -y fincobra-mcp@0.3.1 login
 ```
 
 The command opens FinCobra in your browser.
@@ -26,7 +26,7 @@ You do not copy browser cookies, session tokens, or access tokens.
 2. Add the MCP command to your client:
 
 ```bash
-npx -y fincobra-mcp@0.3.0
+npx -y fincobra-mcp@0.3.1
 ```
 
 3. Restart the MCP client.
@@ -34,11 +34,11 @@ npx -y fincobra-mcp@0.3.0
 Check or remove the saved login at any time:
 
 ```bash
-npx -y fincobra-mcp@0.3.0 status
-npx -y fincobra-mcp@0.3.0 logout
+npx -y fincobra-mcp@0.3.1 status
+npx -y fincobra-mcp@0.3.1 logout
 ```
 
-Pin this release with `npx -y fincobra-mcp@0.3.0`.
+Pin this release with `npx -y fincobra-mcp@0.3.1`.
 
 ## Access model
 
@@ -78,10 +78,16 @@ Invoice settlement assets come from the merchant's Checkout payment methods:
 
 | Tool            | What it does                                               |
 | --------------- | ---------------------------------------------------------- |
-| `get_net_worth` | Return live crypto and manual asset totals in USD.         |
+| `get_net_worth` | Return all sources and net worth in USD or a requested currency.         |
 | `list_sources`  | List wallets, exchanges, live balances, and manual assets. |
 | `get_source`    | Read one source by the ID from `list_sources`.             |
 | `add_car`       | Add a car with a name, currency, value, and optional note. |
+
+`get_net_worth`, `list_sources`, and `get_source` accept an optional `currency`. USD is the default. Supported values are `USD`, `VND`, `EUR`, `GBP`, `JPY`, `SGD`, `AUD`, `CAD`, `CHF`, `CNY`, `RUB`, `GEL`, `THB`, `BTC`, and `XAU` (troy ounces of gold).
+
+For example, call `get_net_worth` with `{"currency":"EUR"}`. The result includes all sources, original token amounts and manual values, `valueUsd`, and `valueInReportingCurrency`. The total is available as `totalNetWorthUsd` and `totalNetWorthInReportingCurrency`. Property totals deduct the mortgage balance.
+
+Unsupported Hyperliquid tokens remain available with their original amounts, `includedInTotal: false`, and `exclusionReason: "unsupported_token"`. They do not block totals. Their price fields are `null`. Supported assets with missing prices still make the total incomplete.
 
 Banks, cash, property, and cars are manual entries. `cryptoUsd` and `totalNetWorthUsd` are `null` when any live crypto source is temporarily unavailable. In that case, `pricedCryptoUsd` contains the sources that were valued successfully.
 
@@ -96,7 +102,7 @@ Add this to `.cursor/mcp.json` or `~/.cursor/mcp.json` after you run the login c
   "mcpServers": {
     "fincobra": {
       "command": "npx",
-      "args": ["-y", "fincobra-mcp@0.3.0"]
+      "args": ["-y", "fincobra-mcp@0.3.1"]
     }
   }
 }
@@ -105,13 +111,13 @@ Add this to `.cursor/mcp.json` or `~/.cursor/mcp.json` after you run the login c
 ### Claude Code
 
 ```bash
-claude mcp add fincobra -- npx -y fincobra-mcp@0.3.0
+claude mcp add fincobra -- npx -y fincobra-mcp@0.3.1
 ```
 
 ### Codex
 
 ```bash
-codex mcp add fincobra -- npx -y fincobra-mcp@0.3.0
+codex mcp add fincobra -- npx -y fincobra-mcp@0.3.1
 ```
 
 Or add this to `~/.codex/config.toml`:
@@ -119,7 +125,7 @@ Or add this to `~/.codex/config.toml`:
 ```toml
 [mcp_servers.fincobra]
 command = "npx"
-args = ["-y", "fincobra-mcp@0.3.0"]
+args = ["-y", "fincobra-mcp@0.3.1"]
 ```
 
 ## Environment variables

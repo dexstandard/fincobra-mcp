@@ -1,6 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
+import { REPORTING_CURRENCIES } from './watchlist-client.types.js';
 import {
+  handleAddCar,
   handleCreateInvoice,
   handleGetInvoice,
   handleGetNetWorth,
@@ -54,7 +56,16 @@ const getInvoiceInputSchema = z.object({
     .describe('Invoice id returned by create_invoice.'),
 });
 
-const getSourceInputSchema = z.object({
+const reportingInputSchema = z.object({
+  currency: z
+    .enum(REPORTING_CURRENCIES)
+    .optional()
+    .describe(
+      'Reporting currency. Defaults to USD. Original amounts and USD values are always retained. BTC is bitcoin and XAU is troy ounces of gold.',
+    ),
+});
+
+const getSourceInputSchema = reportingInputSchema.extend({
   sourceId: z
     .string()
     .min(1)
@@ -63,9 +74,43 @@ const getSourceInputSchema = z.object({
     ),
 });
 
+const addCarInputSchema = z.object({
+  name: z.string().trim().min(1).max(160).describe('Car name or description.'),
+  currency: z
+    .enum([
+      'USD',
+      'VND',
+      'EUR',
+      'GBP',
+      'JPY',
+      'SGD',
+      'AUD',
+      'CAD',
+      'CHF',
+      'CNY',
+      'RUB',
+      'GEL',
+      'THB',
+    ])
+    .describe('Currency used for the estimated car value.'),
+  value: z
+    .number()
+    .finite()
+    .min(0)
+    .max(1_000_000_000_000_000)
+    .describe('Current estimated car value in the selected currency.'),
+  note: z.string().trim().max(2000).optional(),
+});
+
 const watchlistSourceSchema = z.object({
   id: z.string(),
-  kind: z.enum(['wallet', 'exchange', 'manual_bank', 'manual_property']),
+  kind: z.enum([
+    'wallet',
+    'exchange',
+    'manual_bank',
+    'manual_property',
+    'manual_car',
+  ]),
   label: z.string(),
   blockchain: z.string().nullable(),
   displayAddress: z.string().nullable(),
@@ -84,14 +129,49 @@ const watchlistSourceSchema = z.object({
       }),
     )
     .nullable(),
+  balances: z
+    .array(
+      z.object({
+        asset: z.string(),
+        includedInTotal: z.boolean(),
+        exclusionReason: z.literal('unsupported_token').nullable(),
+        balance: z.number(),
+        valueUsd: z.number().nullable(),
+      }),
+    )
+    .nullable(),
+  valuationStatus: z.enum(['complete', 'partial', 'unavailable']),
+});
+
+const reportedSourceSchema = watchlistSourceSchema.extend({
+  reportingCurrency: z.enum(REPORTING_CURRENCIES),
+  valueInReportingCurrency: z.number().nullable(),
+  balances: z
+    .array(
+      z.object({
+        asset: z.string(),
+        includedInTotal: z.boolean(),
+        exclusionReason: z.literal('unsupported_token').nullable(),
+        balance: z.number(),
+        valueUsd: z.number().nullable(),
+        valueInReportingCurrency: z.number().nullable(),
+      }),
+    )
+    .nullable(),
 });
 
 const netWorthSchema = z.object({
+  reportingCurrency: z.enum(REPORTING_CURRENCIES),
+  totalNetWorthInReportingCurrency: z.number().nullable(),
+  sources: z.array(reportedSourceSchema),
   banksUsd: z.number(),
   cashUsd: z.number(),
   propertyUsd: z.number(),
+  carsUsd: z.number(),
   manualTotalUsd: z.number(),
-  cryptoUsd: z.null(),
+  pricedCryptoUsd: z.number(),
+  cryptoUsd: z.number().nullable(),
+  totalNetWorthUsd: z.number().nullable(),
   unpricedManualAssetCount: z.number(),
   sourceCounts: z.object({
     wallets: z.number(),
@@ -149,7 +229,8 @@ export function createFincobraMcpServer(
     {
       title: 'Get Watchlist net worth',
       description:
-        'Read Watchlist net worth from existing list APIs. Banks, cash, and property are manual entries. Live crypto USD balances are not on the list API and come back as null.',
+        'Read all Watchlist sources and net worth with original amounts, USD values, and optional reporting-currency values. Unsupported tokens marked excluded do not block totals. Banks, cash, property, and cars are manual entries. When a live source cannot be valued, cryptoUsd and totalNetWorthUsd are null and pricedCryptoUsd contains the available subtotal.',
+      inputSchema: reportingInputSchema,
       outputSchema: netWorthSchema,
       annotations: {
         readOnlyHint: true,
@@ -157,7 +238,7 @@ export function createFincobraMcpServer(
         idempotentHint: true,
       },
     },
-    async () => handleGetNetWorth(options.watchlistClient),
+    async (input) => handleGetNetWorth(options.watchlistClient, input),
   );
 
   server.registerTool(
@@ -165,15 +246,16 @@ export function createFincobraMcpServer(
     {
       title: 'List Watchlist sources',
       description:
-        'List Watchlist wallets, exchanges, and manual bank/cash/property sources. Includes stored token PnL cost-basis rows when the API has them. Does not add wallets or edit assets.',
-      outputSchema: z.object({ sources: z.array(watchlistSourceSchema) }),
+        'List Watchlist wallets, exchanges, and manual bank, cash, property, or car sources. Includes live crypto balances and stored token PnL cost-basis rows when available.',
+      inputSchema: reportingInputSchema,
+      outputSchema: z.object({ sources: z.array(reportedSourceSchema) }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
       },
     },
-    async () => handleListSources(options.watchlistClient),
+    async (input) => handleListSources(options.watchlistClient, input),
   );
 
   server.registerTool(
@@ -183,7 +265,7 @@ export function createFincobraMcpServer(
       description:
         'Look up one Watchlist source by the id returned from list_sources.',
       inputSchema: getSourceInputSchema,
-      outputSchema: watchlistSourceSchema,
+      outputSchema: reportedSourceSchema,
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -191,6 +273,23 @@ export function createFincobraMcpServer(
       },
     },
     async (input) => handleGetSource(options.watchlistClient, input),
+  );
+
+  server.registerTool(
+    'add_car',
+    {
+      title: 'Add Watchlist car',
+      description:
+        'Add a car to Watchlist as a manual asset using its current estimated value.',
+      inputSchema: addCarInputSchema,
+      outputSchema: watchlistSourceSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+      },
+    },
+    async (input) => handleAddCar(options.watchlistClient, input),
   );
 
   return server;

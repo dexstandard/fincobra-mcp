@@ -1,20 +1,24 @@
 import { CheckoutApiError, normalizeBaseUrl } from './checkout-client.js';
+import { FINCOBRA_MCP_VERSION } from './version.js';
 import type {
+  AddWatchlistCarInput,
   WatchlistClient,
   WatchlistClientConfig,
   WatchlistFetch,
+  WatchlistBalance,
   WatchlistNetWorth,
   WatchlistSource,
   WatchlistTokenPnl,
+  ReportingCurrency,
+  WatchlistReportedSource,
 } from './watchlist-client.types.js';
 
 const DEFAULT_BASE_URL = 'https://watch.fincobra.com';
 const REQUEST_TIMEOUT_MS = 30_000;
-const USER_AGENT = 'fincobra-mcp/0.1.0';
+const USER_AGENT = `fincobra-mcp/${FINCOBRA_MCP_VERSION}`;
 
 const MANUAL_NET_WORTH_NOTES = [
-  'Banks, cash, and property values are manual Watchlist entries, not live bank or title feeds.',
-  'Live crypto wallet and exchange USD balances are computed in the Watchlist UI. The list API does not return those balances.',
+  'Banks, cash, property, and cars are manual Watchlist entries, not live financial or title feeds.',
 ];
 
 export function createWatchlistClient(
@@ -31,10 +35,10 @@ export function createWatchlistClient(
   const fetchImpl = config.fetchImpl ?? fetch;
 
   return {
-    async listSources() {
-      return listWatchlistSources(fetchImpl, baseUrl, accessToken);
+    async listSources(currency = 'USD') {
+      return listWatchlistSources(fetchImpl, baseUrl, accessToken, currency);
     },
-    async getSource(sourceId) {
+    async getSource(sourceId, currency = 'USD') {
       const id = sourceId.trim();
       if (id.length === 0) {
         throw new CheckoutApiError(400, 'sourceId is required');
@@ -44,6 +48,7 @@ export function createWatchlistClient(
         fetchImpl,
         baseUrl,
         accessToken,
+        currency,
       );
       const match = sources.find((source) => source.id === id);
       if (!match) {
@@ -51,13 +56,17 @@ export function createWatchlistClient(
       }
       return match;
     },
-    async getNetWorth() {
+    async getNetWorth(currency = 'USD') {
       const sources = await listWatchlistSources(
         fetchImpl,
         baseUrl,
         accessToken,
+        currency,
       );
-      return buildNetWorth(sources);
+      return buildNetWorth(sources, currency);
+    },
+    async addCar(input) {
+      return addWatchlistCar(fetchImpl, baseUrl, accessToken, input);
     },
   };
 }
@@ -66,41 +75,84 @@ async function listWatchlistSources(
   fetchImpl: WatchlistFetch,
   baseUrl: string,
   accessToken: string,
-): Promise<WatchlistSource[]> {
-  const [walletsPayload, exchangesPayload, manualsPayload, fxPayload] =
-    await Promise.all([
-      requestJson(fetchImpl, baseUrl, accessToken, '/api/watchlist/wallets'),
-      requestJson(fetchImpl, baseUrl, accessToken, '/api/watchlist/exchanges'),
-      requestJson(
-        fetchImpl,
-        baseUrl,
-        accessToken,
-        '/api/watchlist/manual-assets',
-      ),
-      requestJson(
-        fetchImpl,
-        baseUrl,
-        accessToken,
-        '/api/watchlist/fx-rates',
-      ).catch(() => null),
-    ]);
+  currency: ReportingCurrency,
+): Promise<WatchlistReportedSource[]> {
+  const [
+    walletsPayload,
+    exchangesPayload,
+    manualsPayload,
+    fxPayload,
+    sessionPayload,
+  ] = await Promise.all([
+    requestJson(fetchImpl, baseUrl, accessToken, '/api/watchlist/wallets'),
+    requestJson(fetchImpl, baseUrl, accessToken, '/api/watchlist/exchanges'),
+    requestJson(
+      fetchImpl,
+      baseUrl,
+      accessToken,
+      '/api/watchlist/manual-assets',
+    ),
+    requestJson(
+      fetchImpl,
+      baseUrl,
+      accessToken,
+      currency === 'USD'
+        ? '/api/watchlist/fx-rates'
+        : `/api/watchlist/fx-rates?currency=${currency}`,
+    ).catch(() => null),
+    requestJson(fetchImpl, baseUrl, accessToken, '/api/mcp/session').catch(
+      () => null,
+    ),
+  ]);
 
   const usdRates = readUsdRates(fxPayload);
+  const reportingRate = usdRates[currency];
+  if (!Number.isFinite(reportingRate) || reportingRate <= 0) {
+    throw new CheckoutApiError(
+      503,
+      `Reporting currency rate is unavailable: ${currency}`,
+    );
+  }
   const wallets = readArray(asRecord(walletsPayload)?.wallets);
   const exchanges = readArray(asRecord(exchangesPayload)?.exchanges);
   const manuals = readArray(asRecord(manualsPayload)?.manualAssets);
 
-  return [
+  const sources = [
     ...wallets.map((wallet) => toWalletSource(wallet)),
     ...exchanges.map((exchange) => toExchangeSource(exchange)),
     ...manuals.map((asset) => toManualSource(asset, usdRates)),
   ];
+  const accountId = readString(asRecord(asRecord(sessionPayload)?.account)?.id);
+
+  const enriched = await Promise.all(
+    sources.map((source) =>
+      enrichCryptoSource(fetchImpl, baseUrl, accessToken, accountId, source),
+    ),
+  );
+  return enriched.map((source) => ({
+    ...source,
+    reportingCurrency: currency,
+    valueInReportingCurrency:
+      source.valueUsd === null ? null : source.valueUsd * reportingRate,
+    balances:
+      source.balances?.map((balance) => ({
+        ...balance,
+        valueInReportingCurrency:
+          balance.valueUsd === null ? null : balance.valueUsd * reportingRate,
+      })) ?? null,
+  }));
 }
 
-function buildNetWorth(sources: WatchlistSource[]): WatchlistNetWorth {
+function buildNetWorth(
+  sources: WatchlistReportedSource[],
+  currency: ReportingCurrency,
+): WatchlistNetWorth {
   let banksUsd = 0;
   let cashUsd = 0;
   let propertyUsd = 0;
+  let carsUsd = 0;
+  let pricedCryptoUsd = 0;
+  let cryptoValuationComplete = true;
   let unpricedManualAssetCount = 0;
   let wallets = 0;
   let exchanges = 0;
@@ -109,10 +161,20 @@ function buildNetWorth(sources: WatchlistSource[]): WatchlistNetWorth {
   for (const source of sources) {
     if (source.kind === 'wallet') {
       wallets += 1;
+      if (source.valueUsd === null) {
+        cryptoValuationComplete = false;
+      } else {
+        pricedCryptoUsd += source.valueUsd;
+      }
       continue;
     }
     if (source.kind === 'exchange') {
       exchanges += 1;
+      if (source.valueUsd === null) {
+        cryptoValuationComplete = false;
+      } else {
+        pricedCryptoUsd += source.valueUsd;
+      }
       continue;
     }
 
@@ -126,6 +188,10 @@ function buildNetWorth(sources: WatchlistSource[]): WatchlistNetWorth {
       propertyUsd += source.valueUsd;
       continue;
     }
+    if (source.kind === 'manual_car') {
+      carsUsd += source.valueUsd;
+      continue;
+    }
 
     if (source.accountType === 'cash') {
       cashUsd += source.valueUsd;
@@ -134,15 +200,195 @@ function buildNetWorth(sources: WatchlistSource[]): WatchlistNetWorth {
     }
   }
 
+  const manualTotalUsd = banksUsd + cashUsd + propertyUsd + carsUsd;
+  const cryptoUsd = cryptoValuationComplete ? pricedCryptoUsd : null;
+  const notes = [...MANUAL_NET_WORTH_NOTES];
+  const excludedCount = sources.reduce(
+    (count, source) =>
+      count +
+      (source.balances?.filter((balance) => !balance.includedInTotal).length ??
+        0),
+    0,
+  );
+  if (excludedCount > 0)
+    notes.push(
+      `${excludedCount} unsupported token balances are excluded from totals. Their original amounts remain available in sources.`,
+    );
+  if (!cryptoValuationComplete) {
+    notes.push(
+      'Some crypto sources could not be valued. pricedCryptoUsd excludes unavailable sources.',
+    );
+  }
+
+  const complete = cryptoUsd !== null && unpricedManualAssetCount === 0;
   return {
+    reportingCurrency: currency,
+    totalNetWorthInReportingCurrency: complete
+      ? sources.reduce(
+          (total, source) => total + (source.valueInReportingCurrency ?? 0),
+          0,
+        )
+      : null,
+    sources,
     banksUsd,
     cashUsd,
     propertyUsd,
-    manualTotalUsd: banksUsd + cashUsd + propertyUsd,
-    cryptoUsd: null,
+    carsUsd,
+    manualTotalUsd,
+    pricedCryptoUsd,
+    cryptoUsd,
+    totalNetWorthUsd: complete ? manualTotalUsd + cryptoUsd : null,
     unpricedManualAssetCount,
     sourceCounts: { wallets, exchanges, manualAssets },
-    notes: [...MANUAL_NET_WORTH_NOTES],
+    notes,
+  };
+}
+
+async function addWatchlistCar(
+  fetchImpl: WatchlistFetch,
+  baseUrl: string,
+  accessToken: string,
+  input: AddWatchlistCarInput,
+): Promise<WatchlistSource> {
+  const payload = await requestJson(
+    fetchImpl,
+    baseUrl,
+    accessToken,
+    '/api/watchlist/manual-assets/cars',
+    {
+      method: 'POST',
+      body: {
+        name: input.name,
+        currency: input.currency,
+        value: input.value,
+        note: input.note ?? null,
+      },
+    },
+  );
+  const fxPayload = await requestJson(
+    fetchImpl,
+    baseUrl,
+    accessToken,
+    '/api/watchlist/fx-rates',
+  ).catch(() => null);
+  return toManualSource(payload, readUsdRates(fxPayload));
+}
+
+async function enrichCryptoSource(
+  fetchImpl: WatchlistFetch,
+  baseUrl: string,
+  accessToken: string,
+  accountId: string | null,
+  source: WatchlistSource,
+): Promise<WatchlistSource> {
+  try {
+    if (source.kind === 'wallet') {
+      const walletId = source.id.slice('wallet:'.length);
+      const payload = await requestJson(
+        fetchImpl,
+        baseUrl,
+        accessToken,
+        `/api/watchlist/wallets/${encodeURIComponent(walletId)}/balances`,
+      );
+      return withCryptoBalances(source, payload);
+    }
+    if (source.kind === 'exchange' && source.provider && accountId) {
+      if (!['binance', 'bybit', 'hyperliquid'].includes(source.provider)) {
+        return source;
+      }
+      const payload = await requestJson(
+        fetchImpl,
+        baseUrl,
+        accessToken,
+        `/api/users/${encodeURIComponent(accountId)}/${source.provider}/account`,
+      );
+      return withExchangeBalances(source, payload);
+    }
+    return source;
+  } catch {
+    return source;
+  }
+}
+
+function withCryptoBalances(
+  source: WatchlistSource,
+  payload: unknown,
+): WatchlistSource {
+  const record = asRecord(payload);
+  const balances = readBalances(record?.balances);
+  const totalUsd = readNumber(record?.totalUsd);
+  if (!record) {
+    return source;
+  }
+  return {
+    ...source,
+    value: totalUsd,
+    valueUsd: totalUsd,
+    balances,
+    valuationStatus: totalUsd === null ? 'partial' : 'complete',
+  };
+}
+
+function withExchangeBalances(
+  source: WatchlistSource,
+  payload: unknown,
+): WatchlistSource {
+  const record = asRecord(payload);
+  if (!record) {
+    return source;
+  }
+  const prices = readPriceMap(record.tokenPrices);
+  const excludedAssets = new Set(
+    readArray(record.excludedAssets).flatMap((asset) =>
+      typeof asset === 'string' ? [asset.toUpperCase()] : [],
+    ),
+  );
+  const balances = readArray(record.balances).flatMap((raw) => {
+    const balance = asRecord(raw);
+    const asset = balance ? readString(balance.asset) : null;
+    if (!balance || !asset) {
+      return [];
+    }
+    const amount =
+      readArray(balance.sourceBalances).reduce<number>((total, entry) => {
+        const sourceBalance = asRecord(entry);
+        return total + (readNumeric(sourceBalance?.amount) ?? 0);
+      }, 0) + (readNumeric(balance.lockedBalance) ?? 0);
+    const excluded = excludedAssets.has(asset.toUpperCase());
+    const price = excluded ? undefined : prices[asset.toUpperCase()];
+    return [
+      {
+        asset,
+        includedInTotal: !excluded,
+        exclusionReason: excluded ? 'unsupported_token' : null,
+        balance: amount,
+        valueUsd:
+          typeof price === 'number' && Number.isFinite(price)
+            ? amount * price
+            : null,
+      } satisfies WatchlistBalance,
+    ];
+  });
+  const pricedBalances = balances.filter(
+    (balance): balance is WatchlistBalance & { valueUsd: number } =>
+      balance.valueUsd !== null,
+  );
+  const hasUnpricedBalance = balances.some(
+    (balance) =>
+      balance.includedInTotal &&
+      balance.balance > 0 &&
+      balance.valueUsd === null,
+  );
+  const totalUsd = pricedBalances.reduce(
+    (total, balance) => total + balance.valueUsd,
+    0,
+  );
+  return {
+    ...source,
+    value: hasUnpricedBalance ? null : totalUsd,
+    valueUsd: hasUnpricedBalance ? null : totalUsd,
+    balances,
+    valuationStatus: hasUnpricedBalance ? 'partial' : 'complete',
   };
 }
 
@@ -151,16 +397,23 @@ async function requestJson(
   baseUrl: string,
   accessToken: string,
   path: string,
+  options: { method?: 'GET' | 'POST'; body?: unknown } = {},
 ): Promise<unknown> {
   let response: Response;
   try {
     response = await fetchImpl(`${baseUrl}${path}`, {
-      method: 'GET',
+      method: options.method ?? 'GET',
       headers: {
         Accept: 'application/json',
         Authorization: `Bearer ${accessToken}`,
+        ...(options.body === undefined
+          ? {}
+          : { 'Content-Type': 'application/json' }),
         'User-Agent': USER_AGENT,
       },
+      ...(options.body === undefined
+        ? {}
+        : { body: JSON.stringify(options.body) }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   } catch (err: unknown) {
@@ -213,6 +466,8 @@ function toWalletSource(value: unknown): WatchlistSource {
     accountType: null,
     mortgageBalance: null,
     tokenPnl: readTokenPnl(record.tokenPnl),
+    balances: null,
+    valuationStatus: 'unavailable',
   };
 }
 
@@ -233,6 +488,8 @@ function toExchangeSource(value: unknown): WatchlistSource {
     accountType: null,
     mortgageBalance: null,
     tokenPnl: readTokenPnl(record.tokenPnl),
+    balances: null,
+    valuationStatus: 'unavailable',
   };
 }
 
@@ -243,7 +500,11 @@ function toManualSource(
   const record = asRecord(raw) ?? {};
   const id = readString(record.id) ?? 'unknown';
   const assetType =
-    record.assetType === 'manual_property' ? 'manual_property' : 'manual_bank';
+    record.assetType === 'manual_property'
+      ? 'manual_property'
+      : record.assetType === 'manual_car'
+        ? 'manual_car'
+        : 'manual_bank';
   const name = readString(record.name) ?? id;
   const currency = readString(record.currency);
   const value = readNumber(record.value);
@@ -258,6 +519,10 @@ function toManualSource(
       : record.accountType === 'bank'
         ? 'bank'
         : null;
+  const valueUsd =
+    localValue === null || !currency
+      ? null
+      : convertCurrencyToUsd(localValue, currency, usdRates);
 
   return {
     id: `manual:${id}`,
@@ -268,14 +533,52 @@ function toManualSource(
     provider: null,
     currency,
     value,
-    valueUsd:
-      localValue === null || !currency
-        ? null
-        : convertCurrencyToUsd(localValue, currency, usdRates),
+    valueUsd,
     accountType,
     mortgageBalance,
     tokenPnl: null,
+    balances: null,
+    valuationStatus:
+      localValue !== null && currency && valueUsd !== null
+        ? 'complete'
+        : 'unavailable',
   };
+}
+
+function readBalances(value: unknown): WatchlistBalance[] {
+  return readArray(value).flatMap((raw) => {
+    const record = asRecord(raw);
+    const asset = record ? readString(record.asset) : null;
+    const balance = record ? readNumber(record.balance) : null;
+    const valueUsd = record ? readNumber(record.valueUsd) : null;
+    if (!asset || balance === null) {
+      return [];
+    }
+    return [
+      {
+        asset,
+        balance,
+        valueUsd,
+        includedInTotal: true,
+        exclusionReason: null,
+      },
+    ];
+  });
+}
+
+function readPriceMap(value: unknown): Record<string, number> {
+  const record = asRecord(value);
+  const result: Record<string, number> = {};
+  if (!record) {
+    return result;
+  }
+  for (const [asset, rawPrice] of Object.entries(record)) {
+    const price = readNumeric(rawPrice);
+    if (price !== null && price > 0) {
+      result[asset.toUpperCase()] = price;
+    }
+  }
+  return result;
 }
 
 function readTokenPnl(value: unknown): WatchlistTokenPnl[] | null {
@@ -377,6 +680,17 @@ function readString(value: unknown): string | null {
 
 function readNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function readNumeric(value: unknown): number | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
 }
 
 function errorMessage(err: unknown): string {

@@ -15,9 +15,24 @@ export interface WatchlistTokenPnl {
   reliable: boolean;
 }
 
+export interface WatchlistBalance {
+  includedInTotal: boolean;
+  exclusionReason: 'unsupported_token' | null;
+  asset: string;
+  balance: number;
+  valueUsd: number | null;
+}
+
+export type WatchlistValuationStatus = 'complete' | 'partial' | 'unavailable';
+
 export interface WatchlistSource {
   id: string;
-  kind: 'wallet' | 'exchange' | 'manual_bank' | 'manual_property';
+  kind:
+    | 'wallet'
+    | 'exchange'
+    | 'manual_bank'
+    | 'manual_property'
+    | 'manual_car';
   label: string;
   blockchain: string | null;
   displayAddress: string | null;
@@ -28,14 +43,29 @@ export interface WatchlistSource {
   accountType: 'bank' | 'cash' | null;
   mortgageBalance: number | null;
   tokenPnl: WatchlistTokenPnl[] | null;
+  balances: WatchlistBalance[] | null;
+  valuationStatus: WatchlistValuationStatus;
+}
+
+export interface AddWatchlistCarInput {
+  name: string;
+  currency: string;
+  value: number;
+  note?: string;
 }
 
 export interface WatchlistNetWorth {
+  reportingCurrency: ReportingCurrency;
+  totalNetWorthInReportingCurrency: number | null;
+  sources: WatchlistReportedSource[];
   banksUsd: number;
   cashUsd: number;
   propertyUsd: number;
+  carsUsd: number;
   manualTotalUsd: number;
-  cryptoUsd: null;
+  pricedCryptoUsd: number;
+  cryptoUsd: number | null;
+  totalNetWorthUsd: number | null;
   unpricedManualAssetCount: number;
   sourceCounts: {
     wallets: number;
@@ -46,7 +76,40 @@ export interface WatchlistNetWorth {
 }
 
 export interface WatchlistClient {
-  listSources(): Promise<WatchlistSource[]>;
-  getSource(sourceId: string): Promise<WatchlistSource>;
-  getNetWorth(): Promise<WatchlistNetWorth>;
+  listSources(currency?: ReportingCurrency): Promise<WatchlistReportedSource[]>;
+  getSource(
+    sourceId: string,
+    currency?: ReportingCurrency,
+  ): Promise<WatchlistReportedSource>;
+  getNetWorth(currency?: ReportingCurrency): Promise<WatchlistNetWorth>;
+  addCar(input: AddWatchlistCarInput): Promise<WatchlistSource>;
+}
+
+export const REPORTING_CURRENCIES = [
+  'USD',
+  'VND',
+  'EUR',
+  'GBP',
+  'JPY',
+  'SGD',
+  'AUD',
+  'CAD',
+  'CHF',
+  'CNY',
+  'RUB',
+  'GEL',
+  'THB',
+  'BTC',
+  'XAU',
+] as const;
+export type ReportingCurrency = (typeof REPORTING_CURRENCIES)[number];
+
+export interface WatchlistReportedBalance extends WatchlistBalance {
+  valueInReportingCurrency: number | null;
+}
+
+export interface WatchlistReportedSource extends WatchlistSource {
+  reportingCurrency: ReportingCurrency;
+  valueInReportingCurrency: number | null;
+  balances: WatchlistReportedBalance[] | null;
 }

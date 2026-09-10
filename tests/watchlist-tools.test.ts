@@ -7,10 +7,12 @@ import {
 import type {
   WatchlistClient,
   WatchlistNetWorth,
-  WatchlistSource,
+  WatchlistReportedSource,
 } from '../src/watchlist-client.types.js';
 
-const source: WatchlistSource = {
+const source: WatchlistReportedSource = {
+  reportingCurrency: 'USD',
+  valueInReportingCurrency: 100,
   id: 'manual:3',
   kind: 'manual_bank',
   label: 'Checking',
@@ -23,14 +25,22 @@ const source: WatchlistSource = {
   accountType: 'bank',
   mortgageBalance: null,
   tokenPnl: null,
+  balances: null,
+  valuationStatus: 'complete',
 };
 
 const netWorth: WatchlistNetWorth = {
+  reportingCurrency: 'USD',
+  totalNetWorthInReportingCurrency: 100,
+  sources: [source],
   banksUsd: 100,
   cashUsd: 0,
   propertyUsd: 0,
+  carsUsd: 0,
   manualTotalUsd: 100,
-  cryptoUsd: null,
+  pricedCryptoUsd: 0,
+  cryptoUsd: 0,
+  totalNetWorthUsd: 100,
   unpricedManualAssetCount: 0,
   sourceCounts: { wallets: 0, exchanges: 0, manualAssets: 1 },
   notes: ['manual'],
@@ -47,6 +57,9 @@ describe('watchlist MCP tools', () => {
       },
       async getNetWorth() {
         return netWorth;
+      },
+      async addCar() {
+        return source;
       },
     };
 
@@ -68,6 +81,9 @@ describe('watchlist MCP tools', () => {
       },
       async getNetWorth() {
         return netWorth;
+      },
+      async addCar() {
+        return source;
       },
     };
 

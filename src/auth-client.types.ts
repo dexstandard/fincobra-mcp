@@ -1,5 +1,6 @@
 export type McpAccessScope =
   | 'watchlist:read'
+  | 'watchlist:write'
   | 'checkout:read'
   | 'checkout:write';
 

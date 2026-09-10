@@ -1,6 +1,9 @@
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import type { CheckoutClient } from './checkout-client.types.js';
-import type { WatchlistClient } from './watchlist-client.types.js';
+import type {
+  ReportingCurrency,
+  WatchlistClient,
+} from './watchlist-client.types.js';
 
 export interface CheckoutMcpServerOptions {
   client?: CheckoutClient;
@@ -21,6 +24,17 @@ export interface GetInvoiceToolInput {
   invoiceId: string;
 }
 
-export interface GetWatchlistSourceInput {
+export interface WatchlistReportingInput {
+  currency?: ReportingCurrency;
+}
+
+export interface GetWatchlistSourceInput extends WatchlistReportingInput {
   sourceId: string;
+}
+
+export interface AddWatchlistCarToolInput {
+  name: string;
+  currency: string;
+  value: number;
+  note?: string;
 }

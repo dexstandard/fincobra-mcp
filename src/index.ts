@@ -3,6 +3,7 @@ export {
   createCheckoutClient,
   normalizeBaseUrl,
 } from './checkout-client.js';
+export { hasRequiredLoginScopes } from './auth-client.js';
 export type {
   CheckoutClient,
   CheckoutClientConfig,
@@ -22,13 +23,16 @@ export type {
 } from './env.types.js';
 export { createCheckoutMcpServer, createFincobraMcpServer } from './server.js';
 export type {
+  AddWatchlistCarToolInput,
   CheckoutMcpServerOptions,
   CheckoutMcpToolResult,
   CreateInvoiceToolInput,
   GetInvoiceToolInput,
   GetWatchlistSourceInput,
+  WatchlistReportingInput,
 } from './server.types.js';
 export {
+  handleAddCar,
   handleCreateInvoice,
   handleGetInvoice,
   handleGetNetWorth,
@@ -37,10 +41,18 @@ export {
 } from './tools.js';
 export { createWatchlistClient } from './watchlist-client.js';
 export type {
+  AddWatchlistCarInput,
+  ReportingCurrency,
+  WatchlistReportedSource,
+  WatchlistReportedBalance,
+  WatchlistBalance,
   WatchlistClient,
   WatchlistClientConfig,
   WatchlistFetch,
   WatchlistNetWorth,
   WatchlistSource,
   WatchlistTokenPnl,
+  WatchlistValuationStatus,
 } from './watchlist-client.types.js';
+
+export { REPORTING_CURRENCIES } from './watchlist-client.types.js';

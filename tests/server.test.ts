@@ -25,6 +25,9 @@ const unusedWatchlist: WatchlistClient = {
   async getNetWorth() {
     throw new Error('unused');
   },
+  async addCar() {
+    throw new Error('unused');
+  },
 };
 
 describe('createFincobraMcpServer', () => {
@@ -40,6 +43,7 @@ describe('createFincobraMcpServer', () => {
       'get_net_worth',
       'list_sources',
       'get_source',
+      'add_car',
     ]);
   });
 
